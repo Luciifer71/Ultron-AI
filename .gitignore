@@ -7,8 +7,14 @@ __pycache__/
 .env
 *.env
 secrets.json
+!.env.example
 
-# Audio / Media runtime dumps
+# Local Runtime Databases & Vector Stores
+chroma_db/
+ultron_memory.db
+nats_data/
+
+# Audio / Media runtime dumps & logs
 *.wav
 *.mp4
 *.avi
