@@ -1,17 +1,43 @@
 import { useFrame } from '@react-three/fiber'
-import { useMemo, useRef } from 'react'
+import { useMemo } from 'react'
 import * as THREE from 'three'
 
 /* =========================================================
-   DYNAMIC ENERGY FIELD SHADERS
+   TYPES
    ========================================================= */
 
-const flowTubeVertexShader = `
+type FilamentData = {
+  geometry: THREE.TubeGeometry
+}
+
+type CircuitData = {
+  geometry: THREE.TubeGeometry
+  color: string
+  opacity: number
+  rotation: [number, number, number]
+}
+
+/* =========================================================
+   DETERMINISTIC RANDOM
+   ========================================================= */
+
+function random01(seed: number): number {
+  const value =
+    Math.sin(seed * 12.9898) *
+    43758.5453123
+
+  return value - Math.floor(value)
+}
+
+/* =========================================================
+   DYNAMIC FILAMENT VERTEX SHADER
+   ========================================================= */
+
+const filamentVertexShader = `
 uniform float uTime;
 
 attribute float aPhase;
 attribute float aSpeed;
-attribute float aWarp;
 
 varying float vProgress;
 varying float vPhase;
@@ -21,70 +47,44 @@ void main() {
 
   vec3 p = position;
 
-  float t = uv.x;
+  float t = clamp(uv.x, 0.0, 1.0);
 
-  /*
-   * Each filament has its own independent
-   * temporal identity.
-   */
   float phase =
     aPhase +
     uTime * aSpeed;
 
-  /*
-   * Large-scale breathing movement.
-   */
-  float waveA =
+  /* Fine deformation */
+  float wave1 =
     sin(
-      t * 9.0 +
+      t * 18.0 +
       phase
-    );
+    ) * 0.012;
 
-  float waveB =
+  float wave2 =
     sin(
-      t * 19.0 -
-      phase * 1.37
-    );
+      t * 37.0 -
+      phase * 1.6
+    ) * 0.006;
 
-  float waveC =
-    sin(
-      t * 31.0 +
-      phase * 0.71
-    );
-
-  /*
-   * Multi-frequency deformation.
-   */
-  float deformation =
-    waveA * 0.040 +
-    waveB * 0.018 +
-    waveC * 0.009;
-
-  /*
-   * Make the displacement strongest
-   * away from the center of the strand.
-   */
   float envelope =
-    sin(t * 3.14159265);
+    sin(
+      t * 3.14159265
+    );
 
-  deformation *=
-    0.45 +
-    envelope * 0.85;
+  float deformation =
+    (wave1 + wave2) *
+    (0.4 + envelope * 0.6);
 
-  /*
-   * Warp the actual tube surface.
-   */
   p +=
     normal *
-    deformation *
-    (0.7 + aWarp);
+    deformation;
 
   /*
-   * Slow 3D twist.
+   * Very slow independent rotation.
+   * This keeps every filament alive.
    */
   float angle =
-    phase *
-    0.12;
+    phase * 0.055;
 
   float s = sin(angle);
   float c = cos(angle);
@@ -93,43 +93,38 @@ void main() {
     mat2(
       c, -s,
       s,  c
-    ) *
-    p.xz;
+    ) * p.xz;
 
   /*
-   * Asymmetric vertical breathing.
+   * Subtle vertical breathing.
    */
   p.y +=
     sin(
-      t * 6.0 +
-      phase * 0.43
+      t * 8.0 +
+      phase * 0.37
     ) *
-    0.035 *
+    0.018 *
     envelope;
 
   vec4 mvPosition =
     modelViewMatrix *
-    vec4(
-      p,
-      1.0
-    );
+    vec4(p, 1.0);
 
   gl_Position =
     projectionMatrix *
     mvPosition;
 
-  vProgress =
-    t;
-
-  vPhase =
-    aPhase;
-
-  vSpeed =
-    aSpeed;
+  vProgress = t;
+  vPhase = aPhase;
+  vSpeed = aSpeed;
 }
 `
 
-const flowTubeFragmentShader = `
+/* =========================================================
+   DYNAMIC FILAMENT FRAGMENT SHADER
+   ========================================================= */
+
+const filamentFragmentShader = `
 uniform float uTime;
 
 varying float vProgress;
@@ -139,16 +134,16 @@ varying float vSpeed;
 void main() {
 
   /*
-   * Moving energy packet.
+   * Main travelling energy packet.
    */
   float head =
     fract(
       uTime *
       (
-        0.055 +
+        0.045 +
         vSpeed * 0.018
       ) +
-      vPhase * 0.031
+      vPhase * 0.021
     );
 
   float distanceToHead =
@@ -160,25 +155,24 @@ void main() {
   distanceToHead =
     min(
       distanceToHead,
-      1.0 -
-      distanceToHead
+      1.0 - distanceToHead
     );
 
   float pulse =
     smoothstep(
-      0.125,
+      0.085,
       0.0,
       distanceToHead
     );
 
   /*
-   * Secondary pulse.
+   * Secondary weaker packet.
    */
   float head2 =
     fract(
       head +
-      0.47 +
-      sin(vPhase) * 0.08
+      0.43 +
+      sin(vPhase) * 0.06
     );
 
   float distanceToHead2 =
@@ -190,151 +184,560 @@ void main() {
   distanceToHead2 =
     min(
       distanceToHead2,
-      1.0 -
-      distanceToHead2
+      1.0 - distanceToHead2
     );
 
   float pulse2 =
     smoothstep(
-      0.075,
+      0.065,
       0.0,
       distanceToHead2
     );
 
   /*
    * ULTRON palette.
+   *
+   * RED   = dominant
+   * BLUE  = secondary
+   * GOLD  = rare event energy
    */
   vec3 red =
-  vec3(
-    1.0,
-    0.003,
-    0.008
-  );
-
-vec3 deepRed =
-  vec3(
-    0.16,
-    0.001,
-    0.004
-  );
-
-vec3 blue =
-  vec3(
-    0.005,
-    0.055,
-    0.65
-  );
-
-vec3 gold =
-  vec3(
-    1.0,
-    0.28,
-    0.005
-  );
-
-  /*
-   * Stable base color.
-   */
-  float channel =
-    0.5 +
-    0.5 *
-    sin(
-      vPhase * 1.73
+    vec3(
+      1.0,
+      0.004,
+      0.012
     );
 
-  color =
-  mix(
-    deepRed,
-    blue,
-    smoothstep(
-      0.52,
-      0.82,
-      channel
-    ) * 0.28
-  );
+  vec3 deepRed =
+    vec3(
+      0.20,
+      0.001,
+      0.004
+    );
 
-color =
-  mix(
-    color,
-    red,
-    0.72
-  );
+  vec3 blue =
+    vec3(
+      0.005,
+      0.075,
+      0.78
+    );
 
-  /*
-   * Red dominates energetic regions.
-   */
-  color =
-  mix(
-    color,
-    red,
-    pulse * 0.95
-  );
+  vec3 gold =
+    vec3(
+      1.0,
+      0.30,
+      0.008
+    );
 
   /*
-   * Gold is reserved for rare
-   * high-energy events.
+   * Deterministic filament identity.
    */
-  float goldMask =
+  float identityNoise =
+    fract(
+      sin(
+        vPhase * 4.173
+      ) *
+      43758.5453
+    );
+
+  vec3 baseColor;
+
+  if (identityNoise < 0.67) {
+
+    baseColor =
+      mix(
+        deepRed,
+        red,
+        0.78
+      );
+
+  } else {
+
+    baseColor =
+      mix(
+        deepRed,
+        blue,
+        0.80
+      );
+  }
+
+  /*
+   * Energy pulse becomes brighter red.
+   */
+  baseColor =
+    mix(
+      baseColor,
+      red,
+      pulse * 0.78
+    );
+
+  /*
+   * Gold only appears at high-energy events.
+   */
+  float goldEvent =
+    pulse *
     smoothstep(
       0.72,
-      1.0,
-      sin(
-        vPhase * 2.91
-      ) * 0.5 + 0.5
+      0.96,
+      identityNoise
     );
 
-  color =
+  baseColor =
     mix(
-      color,
+      baseColor,
       gold,
-      goldMask *
-      (
-        pulse * 0.72 +
-        pulse2 * 0.28
+      goldEvent * 0.82
+    );
+
+  /*
+   * Quiet baseline.
+   */
+  float structuralEnergy =
+    0.035 +
+    0.025 *
+    (
+      0.5 +
+      0.5 *
+      sin(
+        vProgress * 24.0 +
+        vPhase
       )
     );
 
-  /*
-   * Fine internal energy variation.
-   */
-  float structuralEnergy =
-    0.08 +
-    0.055 *
-    sin(
-      vProgress * 28.0 +
-      vPhase * 1.7
-    );
+  float intensity =
+    structuralEnergy +
+    pulse * 1.55 +
+    pulse2 * 0.42;
 
-float intensity =
-  structuralEnergy +
-  pulse * 1.45 +
-  pulse2 * 0.45;
+  float alpha =
+    0.11 +
+    pulse * 0.44 +
+    pulse2 * 0.14;
 
-float alpha =
-  0.10 +
-  pulse * 0.40 +
-  pulse2 * 0.16;
-
-  /*
-   * Keep highlights bright without
-   * turning the whole field white.
-   */
   intensity =
     min(
       intensity,
-      2.15
+      1.85
     );
 
   gl_FragColor =
     vec4(
-      color * intensity,
+      baseColor * intensity,
       alpha
     );
 }
 `
 
 /* =========================================================
-   DYNAMIC CIRCUIT FIELD
+   CREATE FILAMENT GEOMETRIES
+   ========================================================= */
+
+function createFilaments(): FilamentData[] {
+
+  const filamentCount = 18
+  const samples = 76
+
+  const output: FilamentData[] = []
+
+  for (
+    let filament = 0;
+    filament < filamentCount;
+    filament++
+  ) {
+
+    const seed =
+      filament + 1
+
+    const phase =
+      filament *
+      2.399963 +
+      random01(
+        seed + 100
+      ) *
+      Math.PI
+
+    const startAngle =
+      random01(
+        seed + 10
+      ) *
+      Math.PI *
+      2.0
+
+    const radius =
+      0.82 +
+      random01(
+        seed + 20
+      ) *
+      0.62
+
+    const twist =
+      0.70 +
+      random01(
+        seed + 30
+      ) *
+      1.70
+
+    const tilt =
+      0.30 +
+      random01(
+        seed + 40
+      ) *
+      0.95
+
+    const points: THREE.Vector3[] = []
+
+    for (
+      let i = 0;
+      i < samples;
+      i++
+    ) {
+
+      const t =
+        i /
+        (samples - 1)
+
+      const theta =
+        startAngle +
+        t *
+        Math.PI *
+        2.0 *
+        twist
+
+      /*
+       * Non-planar path.
+       */
+      const latitude =
+        Math.sin(
+          t *
+          Math.PI *
+          (
+            1.0 +
+            random01(
+              seed + 50
+            ) *
+            1.8
+          )
+        ) *
+        tilt
+
+      /*
+       * Small multi-frequency radial deformation.
+       */
+      const radiusWave =
+        Math.sin(
+          t * 7.0 +
+          phase
+        ) *
+        0.055
+        +
+        Math.sin(
+          t * 17.0 -
+          phase * 0.8
+        ) *
+        0.022
+
+      const r =
+        radius +
+        radiusWave
+
+      const cosLatitude =
+        Math.cos(latitude)
+
+      const x =
+        Math.cos(theta) *
+        cosLatitude *
+        r
+
+      const y =
+        Math.sin(latitude) *
+        r
+
+      const z =
+        Math.sin(theta) *
+        cosLatitude *
+        r
+
+      points.push(
+        new THREE.Vector3(
+          x,
+          y,
+          z
+        )
+      )
+    }
+
+    const curve =
+      new THREE.CatmullRomCurve3(
+        points,
+        false,
+        'centripetal',
+        0.5
+      )
+
+    const geometry =
+      new THREE.TubeGeometry(
+        curve,
+        samples,
+        0.0035 +
+        random01(
+          seed + 60
+        ) * 0.0045,
+        5,
+        false
+      )
+
+    const vertexCount =
+      geometry.attributes.position.count
+
+    const phases =
+      new Float32Array(
+        vertexCount
+      )
+
+    const speeds =
+      new Float32Array(
+        vertexCount
+      )
+
+    const speed =
+      0.35 +
+      random01(
+        seed + 70
+      ) * 1.10
+
+    for (
+      let i = 0;
+      i < vertexCount;
+      i++
+    ) {
+
+      phases[i] =
+        phase
+
+      speeds[i] =
+        speed
+    }
+
+    geometry.setAttribute(
+      'aPhase',
+      new THREE.BufferAttribute(
+        phases,
+        1
+      )
+    )
+
+    geometry.setAttribute(
+      'aSpeed',
+      new THREE.BufferAttribute(
+        speeds,
+        1
+      )
+    )
+
+    output.push({
+      geometry
+    })
+  }
+
+  return output
+}
+
+/* =========================================================
+   CREATE FRAGMENTED CIRCUIT ARCS
+   ========================================================= */
+
+function createCircuitArcs(): CircuitData[] {
+
+  const arcCount = 26
+
+  const output: CircuitData[] = []
+
+  for (
+    let arc = 0;
+    arc < arcCount;
+    arc++
+  ) {
+
+    const seed =
+      arc + 500
+
+    const startAngle =
+      random01(
+        seed
+      ) *
+      Math.PI *
+      2.0
+
+    const arcLength =
+      0.20 +
+      random01(
+        seed + 1
+      ) * 0.72
+
+    const radius =
+      0.88 +
+      random01(
+        seed + 2
+      ) * 0.72
+
+    const tilt =
+      (
+        random01(
+          seed + 3
+        ) -
+        0.5
+      ) *
+      1.35
+
+    const verticalOffset =
+      (
+        random01(
+          seed + 4
+        ) -
+        0.5
+      ) *
+      0.40
+
+    const points: THREE.Vector3[] = []
+
+    const segments = 22
+
+    for (
+      let i = 0;
+      i < segments;
+      i++
+    ) {
+
+      const t =
+        i /
+        (segments - 1)
+
+      const theta =
+        startAngle +
+        t *
+        arcLength *
+        Math.PI *
+        2.0
+
+      const jitter =
+        (
+          random01(
+            seed + i * 0.71
+          ) -
+          0.5
+        ) *
+        0.05
+
+      const r =
+        radius +
+        jitter
+
+      const x =
+        Math.cos(theta) *
+        r
+
+      const y =
+        Math.sin(
+          t * Math.PI
+        ) *
+        tilt +
+        verticalOffset +
+        jitter
+
+      const z =
+        Math.sin(theta) *
+        r
+
+      points.push(
+        new THREE.Vector3(
+          x,
+          y,
+          z
+        )
+      )
+    }
+
+    const curve =
+      new THREE.CatmullRomCurve3(
+        points,
+        false,
+        'centripetal',
+        0.5
+      )
+
+    const geometry =
+      new THREE.TubeGeometry(
+        curve,
+        30,
+        0.0045 +
+        random01(
+          seed + 8
+        ) * 0.004,
+        5,
+        false
+      )
+
+    let color = '#071f7a'
+
+    if (
+      arc % 7 === 0
+    ) {
+
+      color =
+        '#ff8c18'
+
+    } else if (
+      arc % 3 === 0
+    ) {
+
+      color =
+        '#0b45d6'
+
+    } else if (
+      arc % 2 === 0
+    ) {
+
+      color =
+        '#8d0018'
+
+    }
+
+    const opacity =
+      0.10 +
+      random01(
+        seed + 9
+      ) *
+      0.16
+
+    const rotation: [
+      number,
+      number,
+      number
+    ] = [
+      random01(
+        seed + 10
+      ) * Math.PI,
+      random01(
+        seed + 11
+      ) * Math.PI,
+      random01(
+        seed + 12
+      ) * Math.PI
+    ]
+
+    output.push({
+      geometry,
+      color,
+      opacity,
+      rotation
+    })
+  }
+
+  return output
+}
+
+/* =========================================================
+   MAIN CIRCUIT FIELD
    ========================================================= */
 
 function NeuralFilaments() {
@@ -345,360 +748,81 @@ function NeuralFilaments() {
         new THREE.ShaderMaterial({
           uniforms: {
             uTime: {
-              value: 0,
-            },
+              value: 0
+            }
           },
 
           vertexShader:
-            flowTubeVertexShader,
+            filamentVertexShader,
 
           fragmentShader:
-            flowTubeFragmentShader,
+            filamentFragmentShader,
 
           transparent: true,
 
           depthWrite: false,
 
+          depthTest: true,
+
           blending:
             THREE.AdditiveBlending,
 
-          toneMapped: false,
+          toneMapped: false
         }),
-      [],
+      []
     )
 
-  const materialRef =
-    useRef<THREE.ShaderMaterial>(
-      material,
+  const filaments =
+    useMemo(
+      () =>
+        createFilaments(),
+      []
     )
 
-  const tubes =
-    useMemo(() => {
-
-      const streamCount = 30
-      const samples = 78
-
-      const random = (
-        seed: number,
-      ) => {
-
-        const x =
-          Math.sin(
-            seed *
-            12.9898,
-          ) *
-          43758.5453
-
-        return (
-          x -
-          Math.floor(x)
-        )
-      }
-
-      return Array.from(
-        {
-          length:
-            streamCount,
-        },
-        (_, stream) => {
-
-          const phase =
-            stream *
-            2.399963 +
-            random(stream + 101) *
-            2.0
-
-          const points:
-            THREE.Vector3[] =
-            []
-
-          const startAngle =
-            random(
-              stream + 4,
-            ) *
-            Math.PI *
-            2
-
-          /*
-           * Less symmetric than the old
-           * stacked-orbit structure.
-           */
-          const tilt =
-            0.45 +
-            random(
-              stream + 9,
-            ) *
-            1.15
-
-          const twist =
-            0.75 +
-            random(
-              stream + 17,
-            ) *
-            2.15
-
-          const baseRadius =
-            0.90 +
-            random(
-              stream + 25,
-            ) *
-            0.58
-
-          const radialBias =
-            random(
-              stream + 41,
-            ) -
-            0.5
-
-          for (
-            let i = 0;
-            i < samples;
-            i++
-          ) {
-
-            const t =
-              i /
-              (samples - 1)
-
-            /*
-             * Non-uniform angular progression.
-             */
-            const theta =
-              startAngle +
-              t *
-              Math.PI *
-              2 *
-              twist +
-              Math.sin(
-                t * 4.0 +
-                phase
-              ) *
-              0.24
-
-            /*
-             * Non-planar latitude.
-             */
-            const latitude =
-              Math.sin(
-                t *
-                Math.PI *
-                (
-                  1.45 +
-                  random(
-                    stream + 53
-                  ) *
-                  1.4
-                ) +
-                phase
-              ) *
-              tilt *
-              0.62
-
-            /*
-             * Multi-scale radius deformation.
-             */
-            const largeWave =
-              Math.sin(
-                t * 4.0 +
-                phase
-              ) *
-              0.13
-
-            const mediumWave =
-              Math.sin(
-                t * 11.0 -
-                phase * 0.8
-              ) *
-              0.065
-
-            const smallWave =
-              Math.sin(
-                t * 23.0 +
-                phase * 1.7
-              ) *
-              0.028
-
-            const radius =
-              baseRadius +
-              largeWave +
-              mediumWave +
-              smallWave +
-              radialBias *
-              Math.sin(
-                t * Math.PI
-              )
-
-            const cosLat =
-              Math.cos(
-                latitude,
-              )
-
-            /*
-             * Independent X/Y/Z distortion.
-             */
-            const x =
-              Math.cos(theta) *
-              cosLat *
-              radius
-
-            const y =
-              Math.sin(latitude) *
-              radius *
-              (
-                0.82 +
-                random(
-                  stream + 67
-                ) *
-                0.36
-              )
-
-            const z =
-              Math.sin(theta) *
-              cosLat *
-              radius
-
-            points.push(
-              new THREE.Vector3(
-                x,
-                y,
-                z,
-              ),
-            )
-          }
-
-          const curve =
-            new THREE.CatmullRomCurve3(
-              points,
-              false,
-              'centripetal',
-              0.55,
-            )
-
-          const geometry =
-            new THREE.TubeGeometry(
-              curve,
-              samples,
-              0.008 +
-                random(
-                  stream + 33,
-                ) *
-                0.010,
-              7,
-              false,
-            )
-
-          /*
-           * Give every vertex its own
-           * stream parameters.
-           */
-          const vertexCount =
-            geometry.attributes
-              .position.count
-
-          const phases =
-            new Float32Array(
-              vertexCount,
-            )
-
-          const speeds =
-            new Float32Array(
-              vertexCount,
-            )
-
-          const warps =
-            new Float32Array(
-              vertexCount,
-            )
-
-          const speed =
-            0.58 +
-            random(
-              stream + 79,
-            ) *
-            0.85
-
-          const warp =
-            0.55 +
-            random(
-              stream + 91,
-            ) *
-            0.85
-
-          for (
-            let vertex = 0;
-            vertex < vertexCount;
-            vertex++
-          ) {
-
-            phases[vertex] =
-              phase
-
-            speeds[vertex] =
-              speed
-
-            warps[vertex] =
-              warp
-          }
-
-          geometry.setAttribute(
-            'aPhase',
-            new THREE.BufferAttribute(
-              phases,
-              1,
-            ),
-          )
-
-          geometry.setAttribute(
-            'aSpeed',
-            new THREE.BufferAttribute(
-              speeds,
-              1,
-            ),
-          )
-
-          geometry.setAttribute(
-            'aWarp',
-            new THREE.BufferAttribute(
-              warps,
-              1,
-            ),
-          )
-
-          return geometry
-        },
-      )
-    }, [])
+  const circuitArcs =
+    useMemo(
+      () =>
+        createCircuitArcs(),
+      []
+    )
 
   useFrame(
     ({
-      clock,
+      clock
     }) => {
 
-      materialRef.current
-        .uniforms
+      material.uniforms
         .uTime
         .value =
         clock.elapsedTime
-    },
+
+    }
   )
 
   return (
     <group>
 
-      {tubes.map(
+      {/* =================================================
+          THIN ACTIVE FILAMENTS
+         ================================================= */}
+
+      {filaments.map(
         (
-          geometry,
-          index,
+          filament,
+          index
         ) => (
 
           <mesh
-            key={index}
-            geometry={geometry}
+            key={`filament-${index}`}
+            geometry={
+              filament.geometry
+            }
             rotation={[
-              index * 0.013,
-              index * 0.021,
-              index * 0.009,
+              0,
+              index * 0.19,
+              index * 0.07
             ]}
+            frustumCulled={false}
           >
 
             <primitive
@@ -707,7 +831,49 @@ function NeuralFilaments() {
             />
 
           </mesh>
-        ),
+
+        )
+      )}
+
+      {/* =================================================
+          FRAGMENTED CIRCUIT STRUCTURES
+         ================================================= */}
+
+      {circuitArcs.map(
+        (
+          arc,
+          index
+        ) => (
+
+          <mesh
+            key={`arc-${index}`}
+            geometry={
+              arc.geometry
+            }
+            rotation={
+              arc.rotation
+            }
+            frustumCulled={false}
+          >
+
+            <meshBasicMaterial
+              color={
+                arc.color
+              }
+              transparent
+              opacity={
+                arc.opacity
+              }
+              blending={
+                THREE.AdditiveBlending
+              }
+              depthWrite={false}
+              toneMapped={false}
+            />
+
+          </mesh>
+
+        )
       )}
 
     </group>
