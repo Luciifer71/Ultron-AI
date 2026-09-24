@@ -5,6 +5,7 @@ import * as THREE from 'three'
 import SingularityCore from './scene/SingularityCore'
 import ParticleHalo from './scene/EntityParticles'
 import NeuralFilaments from './scene/CircuitField'
+import RenderRuntime from './render/RenderRuntime'
 
 /* =========================================================
    CORE MOTION
@@ -156,7 +157,7 @@ function App() {
             1.0,
         }}
       >
-
+        <RenderRuntime />
         <Scene />
 
       </Canvas>
