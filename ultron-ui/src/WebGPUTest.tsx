@@ -2,6 +2,12 @@ import * as THREE from 'three/webgpu'
 import TSLParticleField from './scene/TSLParticleField'
 import TSLCircuitField
   from './scene/TSLCircuitField'
+import TSLComputationalShell
+  from './scene/TSLComputationalShell'
+import TSLEnergyEvents
+  from './scene/EnergyEvents'
+  import SimulationRuntime
+  from './simulation/SimulationRuntime'
 
 import {
   Canvas,
@@ -61,8 +67,15 @@ export default function WebGPUTest() {
       >
 
         <TSLSingularityCore />
-        <TSLParticleField />
-        <TSLCircuitField />
+
+<TSLParticleField />
+
+<TSLCircuitField />
+
+<TSLComputationalShell />
+
+<TSLEnergyEvents />
+<SimulationRuntime />
       </Canvas>
 
     </div>
