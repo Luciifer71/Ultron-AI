@@ -21,10 +21,6 @@ import {
 } from 'three/webgpu'
 
 import {
-  getEntityVisualState,
-} from '../state/entityStore'
-
-import {
   useEffect,
   useMemo,
   useRef,
@@ -35,20 +31,24 @@ import {
   useThree,
 } from '@react-three/fiber'
 
+import {
+  getEntityVisualState,
+} from '../state/entityStore'
+
 /* =========================================================
    ULTRON INFORMATION FLOW
    =========================================================
 
    RED   = ULTRON / computation
-   BLUE  = information traffic
-   GOLD  = rare high-value execution events
+   BLUE  = information traffic / listening
+   GOLD  = high-value execution traffic
 
-   This system is deliberately sparse.
+   This system is intentionally sparse.
 
    The goal is NOT to create another particle cloud.
 
-   The goal is to create recognizable packets of
-   information moving through ULTRON's computational shell.
+   The goal is to make information visibly travel
+   through ULTRON as discrete computational packets.
 
    Every packet has:
 
@@ -59,9 +59,10 @@ import {
      phase
      lane
 
-   Packets move through a shared computational vector field,
-   accelerate with network activity, brighten with processing,
-   and recycle after completing their path.
+   Packets travel through the computational shell,
+   accelerate with information activity,
+   respond to ULTRON's current visual state,
+   and recycle continuously.
 
    ========================================================= */
 
@@ -110,6 +111,58 @@ export default function TSLInformationFlow() {
   const entityUrgency =
     useMemo(
       () => uniform(0.05),
+      [],
+    )
+
+  /* =======================================================
+     GLOBAL ULTRON VISUAL STATE
+     ======================================================= */
+
+  const redWeight =
+    useMemo(
+      () => uniform(0.94),
+      [],
+    )
+
+  const blueWeight =
+    useMemo(
+      () => uniform(0.05),
+      [],
+    )
+
+  const goldWeight =
+    useMemo(
+      () => uniform(0.01),
+      [],
+    )
+
+  const visualIntensity =
+    useMemo(
+      () => uniform(0.58),
+      [],
+    )
+
+  const visualMotion =
+    useMemo(
+      () => uniform(0.25),
+      [],
+    )
+
+  const visualTurbulence =
+    useMemo(
+      () => uniform(0.18),
+      [],
+    )
+
+  const informationDensity =
+    useMemo(
+      () => uniform(0.08),
+      [],
+    )
+
+  const informationSpeed =
+    useMemo(
+      () => uniform(0.12),
       [],
     )
 
@@ -168,10 +221,10 @@ export default function TSLInformationFlow() {
     )
 
   /*
-   * Each packet gets a stable "lane" value.
+   * Each packet gets a stable lane value.
    *
-   * This determines which part of the shell it prefers.
-   * It is NOT random movement every frame.
+   * This determines which portion of the shell
+   * the packet prefers.
    */
   const lanes =
     useMemo(
@@ -255,6 +308,7 @@ export default function TSLInformationFlow() {
 
           const position =
             vec3(
+
               theta.cos()
                 .mul(planar)
                 .mul(radius),
@@ -264,13 +318,14 @@ export default function TSLInformationFlow() {
               theta.sin()
                 .mul(planar)
                 .mul(radius),
+
             )
 
           const radial =
             position.normalize()
 
           /*
-           * Tangent around the shell.
+           * Tangential flow around the shell.
            */
           const tangent =
             vec3(
@@ -385,20 +440,51 @@ export default function TSLInformationFlow() {
 
           const informationDrive =
             entityNetworkActivity
-              .mul(0.55)
+              .mul(0.45)
+
               .add(
                 entityAttention.mul(
-                  0.20,
+                  0.18,
                 ),
               )
+
               .add(
                 entityProcessing.mul(
-                  0.15,
+                  0.14,
+                ),
+              )
+
+              .add(
+                entityEnergy.mul(
+                  0.08,
+                ),
+              )
+
+              .add(
+                informationDensity.mul(
+                  0.55,
+                ),
+              )
+
+              .add(
+                informationSpeed.mul(
+                  0.35,
+                ),
+              )
+
+          /*
+           * Overall state motion.
+           */
+          const stateMotion =
+            float(0.55)
+              .add(
+                visualMotion.mul(
+                  0.80,
                 ),
               )
               .add(
-                entityEnergy.mul(
-                  0.10,
+                informationSpeed.mul(
+                  0.55,
                 ),
               )
 
@@ -408,18 +494,21 @@ export default function TSLInformationFlow() {
 
           const shellFlow =
             vec3(
+
               position.z.negate(),
 
               position.y
                 .mul(
-                  float(0.20)
-                    .add(
-                      lane.mul(0.25),
+                  float(0.20).add(
+                    lane.mul(
+                      0.25,
                     ),
+                  ),
                 )
                 .negate(),
 
               position.x,
+
             ).normalize()
 
           /* -------------------------------------------------
@@ -428,16 +517,21 @@ export default function TSLInformationFlow() {
 
           const secondaryFlow =
             vec3(
+
               position.y
                 .mul(0.55)
                 .add(
-                  phase.sin().mul(0.18),
+                  phase.sin().mul(
+                    0.18,
+                  ),
                 ),
 
               position.z.negate(),
 
-              position.x
-                .mul(0.75),
+              position.x.mul(
+                0.75,
+              ),
+
             ).normalize()
 
           /* -------------------------------------------------
@@ -446,7 +540,11 @@ export default function TSLInformationFlow() {
 
           const flowTime =
             time.mul(
-              0.40,
+              float(0.32).add(
+                visualTurbulence.mul(
+                  0.42,
+                ),
+              ),
             )
 
           const turbulence =
@@ -460,14 +558,18 @@ export default function TSLInformationFlow() {
               position.z
                 .mul(3.7)
                 .sub(
-                  flowTime.mul(0.8),
+                  flowTime.mul(
+                    0.8,
+                  ),
                 )
                 .cos(),
 
               position.x
                 .mul(4.8)
                 .add(
-                  flowTime.mul(0.55),
+                  flowTime.mul(
+                    0.55,
+                  ),
                 )
                 .sin(),
 
@@ -493,8 +595,15 @@ export default function TSLInformationFlow() {
               )
 
           const laneWave =
-            laneAngle.sin()
-              .mul(0.10)
+            laneAngle
+              .sin()
+              .mul(
+                float(0.07).add(
+                  visualTurbulence.mul(
+                    0.05,
+                  ),
+                ),
+              )
 
           const targetRadius =
             float(1.28)
@@ -505,7 +614,13 @@ export default function TSLInformationFlow() {
           const shellCorrection =
             targetRadius
               .sub(radius)
-              .mul(0.55)
+              .mul(
+                float(0.55).add(
+                  visualMotion.mul(
+                    0.20,
+                  ),
+                ),
+              )
 
           /* -------------------------------------------------
              INNER EXCLUSION
@@ -542,18 +657,18 @@ export default function TSLInformationFlow() {
           const force =
             shellFlow
               .mul(
-                float(0.32).add(
+                float(0.26).add(
                   informationDrive.mul(
-                    0.68,
+                    0.72,
                   ),
                 ),
               )
 
               .add(
                 secondaryFlow.mul(
-                  float(0.10).add(
+                  float(0.08).add(
                     entityProcessing.mul(
-                      0.25,
+                      0.22,
                     ),
                   ),
                 ),
@@ -561,9 +676,9 @@ export default function TSLInformationFlow() {
 
               .add(
                 turbulence.mul(
-                  float(0.035).add(
-                    entityProcessing.mul(
-                      0.15,
+                  float(0.025).add(
+                    visualTurbulence.mul(
+                      0.20,
                     ),
                   ),
                 ),
@@ -586,7 +701,11 @@ export default function TSLInformationFlow() {
               .sub(
                 radial.mul(
                   outerPressure.mul(
-                    1.10,
+                    float(0.90).add(
+                      visualMotion.mul(
+                        0.25,
+                      ),
+                    ),
                   ),
                 ),
               )
@@ -603,15 +722,15 @@ export default function TSLInformationFlow() {
                     deltaTime,
                   )
                   .mul(
-                    float(1.0).add(
-                      informationDrive.mul(
-                        1.35,
-                      ),
-                    ),
+                    stateMotion,
                   ),
               )
               .mul(
-                0.992,
+                float(0.992).sub(
+                  visualMotion.mul(
+                    0.006,
+                  ),
+                ),
               )
 
           /* -------------------------------------------------
@@ -632,9 +751,9 @@ export default function TSLInformationFlow() {
           const newLifetime =
             lifetime.add(
               deltaTime.mul(
-                float(0.12).add(
+                float(0.10).add(
                   informationDrive.mul(
-                    0.30,
+                    0.26,
                   ),
                 ),
               ),
@@ -645,16 +764,17 @@ export default function TSLInformationFlow() {
              ------------------------------------------------- */
 
           const targetEnergy =
-            float(0.40).add(
+            float(0.32).add(
               informationDrive.mul(
-                0.60,
+                0.58,
               ),
             )
 
           const newEnergy =
-            energy.mul(
-              0.985,
-            )
+            energy
+              .mul(
+                0.985,
+              )
               .add(
                 targetEnergy.mul(
                   0.015,
@@ -681,7 +801,9 @@ export default function TSLInformationFlow() {
 
           const recycleMask =
             escaped
-              .add(expired)
+              .add(
+                expired,
+              )
               .clamp(
                 0,
                 1,
@@ -729,13 +851,19 @@ export default function TSLInformationFlow() {
 
           const spawnDirection =
             vec3(
+
               spawnTheta.cos()
-                .mul(spawnPlanar),
+                .mul(
+                  spawnPlanar,
+                ),
 
               spawnY,
 
               spawnTheta.sin()
-                .mul(spawnPlanar),
+                .mul(
+                  spawnPlanar,
+                ),
+
             ).normalize()
 
           const spawnPosition =
@@ -749,15 +877,22 @@ export default function TSLInformationFlow() {
 
           const spawnTangent =
             vec3(
-              spawnDirection.z.negate(),
-              spawnDirection.y.mul(0.12),
+
+              spawnDirection.z
+                .negate(),
+
+              spawnDirection.y.mul(
+                0.12,
+              ),
+
               spawnDirection.x,
+
             ).normalize()
 
           const spawnSpeed =
-            float(0.34).add(
-              informationDrive.mul(
-                0.72,
+            float(0.28).add(
+              informationSpeed.mul(
+                0.75,
               ),
             )
 
@@ -805,11 +940,13 @@ export default function TSLInformationFlow() {
             .assign(
               mix(
                 newEnergy,
-                float(0.60).add(
+
+                float(0.48).add(
                   informationDrive.mul(
-                    0.40,
+                    0.42,
                   ),
                 ),
+
                 recycleMask,
               ),
             )
@@ -819,9 +956,9 @@ export default function TSLInformationFlow() {
             .assign(
               phase.add(
                 deltaTime.mul(
-                  float(0.90).add(
+                  float(0.75).add(
                     informationDrive.mul(
-                      1.80,
+                      1.65,
                     ),
                   ),
                 ),
@@ -843,6 +980,11 @@ export default function TSLInformationFlow() {
         entityAttention,
         entityProcessing,
         entityNetworkActivity,
+
+        visualMotion,
+        visualTurbulence,
+        informationDensity,
+        informationSpeed,
       ],
     )
 
@@ -857,15 +999,26 @@ export default function TSLInformationFlow() {
         const material =
           new SpriteNodeMaterial({
             transparent: true,
-            depthWrite: false,
-            depthTest: true,
+
+            depthWrite:
+              false,
+
+            depthTest:
+              true,
+
             blending:
               THREE.AdditiveBlending,
-            toneMapped: false,
+
+            toneMapped:
+              false,
           })
 
         material.positionNode =
           positions.toAttribute()
+
+        /* -------------------------------------------------
+           PACKET STATE
+           ------------------------------------------------- */
 
         const packetEnergy =
           energies.element(
@@ -880,27 +1033,59 @@ export default function TSLInformationFlow() {
         const packetSpeed =
           packetVelocity.length()
 
-        /*
-         * Larger and longer than ordinary particles.
-         */
+        /* -------------------------------------------------
+           DENSITY MASK
+           -------------------------------------------------
+
+           Only part of the packet population is visually
+           active at once.
+
+           This keeps the information layer readable.
+           ------------------------------------------------- */
+
+        const packetIdentity =
+          hash(
+            instanceIndex.add(
+              3000,
+            ),
+          )
+
+        const activeThreshold =
+          informationDensity
+
+        const activeMask =
+          float(1.0).sub(
+            smoothstep(
+              activeThreshold,
+              activeThreshold.add(
+                0.18,
+              ),
+              packetIdentity,
+            ),
+          )
+
+        /* -------------------------------------------------
+           PACKET LENGTH
+           ------------------------------------------------- */
+
         const packetLength =
-          float(0.09)
+          float(0.065)
             .add(
               packetEnergy.mul(
-                0.18,
+                0.11,
               ),
             )
             .add(
-              entityNetworkActivity.mul(
-                0.08,
+              informationSpeed.mul(
+                0.06,
               ),
             )
 
         const packetWidth =
-          float(0.008)
+          float(0.0055)
             .add(
               packetEnergy.mul(
-                0.012,
+                0.007,
               ),
             )
 
@@ -910,9 +1095,10 @@ export default function TSLInformationFlow() {
             packetWidth,
           )
 
-        /*
-         * Continuous motion along the packet.
-         */
+        /* -------------------------------------------------
+           CONTINUOUS PACKET ROTATION
+           ------------------------------------------------- */
+
         material.rotationNode =
           phases
             .element(
@@ -920,7 +1106,7 @@ export default function TSLInformationFlow() {
             )
             .add(
               time.mul(
-                float(0.25).add(
+                float(0.18).add(
                   packetSpeed.mul(
                     0.08,
                   ),
@@ -928,83 +1114,205 @@ export default function TSLInformationFlow() {
               ),
             )
 
-        /*
-         * =================================================
-         * COLOR IDENTITY
-         * =================================================
-         */
+        /* =================================================
+           ULTRON SEMANTIC COLORS
+           ================================================= */
+
+        const red =
+          vec3(
+            0.90,
+            0.003,
+            0.012,
+          )
 
         const blue =
           vec3(
-            0.01,
-            0.22,
-            1.00,
-          )
-
-        const cyan =
-          vec3(
-            0.18,
-            0.75,
+            0.005,
+            0.16,
             1.00,
           )
 
         const gold =
           vec3(
             1.00,
-            0.48,
-            0.015,
-          )
-
-        const identity =
-          hash(
-            instanceIndex.add(
-              3000,
-            ),
+            0.38,
+            0.008,
           )
 
         /*
-         * Gold packets remain extremely rare.
+         * Global state-controlled base color.
+         *
+         * This replaces the old permanent
+         * blue/cyan/gold identity.
          */
-        const goldChance =
+        const stateColor =
+          red
+            .mul(
+              redWeight,
+            )
+            .add(
+              blue.mul(
+                blueWeight,
+              ),
+            )
+            .add(
+              gold.mul(
+                goldWeight,
+              ),
+            )
+
+        /* -------------------------------------------------
+           PACKET SIGNAL
+           ------------------------------------------------- */
+
+        const packetPhase =
+          time
+            .mul(
+              float(0.60).add(
+                informationSpeed.mul(
+                  2.20,
+                ),
+              ),
+            )
+            .add(
+              phases.element(
+                instanceIndex,
+              ),
+            )
+
+        const packetWave =
+          packetPhase
+            .sin()
+            .mul(0.5)
+            .add(0.5)
+
+        /*
+         * Travelling packet head.
+         */
+        const packetHead =
           smoothstep(
-            0.70,
-            0.95,
-            entityUrgency,
+            0.82,
+            0.995,
+            packetWave,
           )
 
-        const goldMask =
+        /*
+         * Fading packet body.
+         */
+        const packetTrail =
           smoothstep(
-            0.997,
-            0.9997,
-            identity,
+            0.30,
+            0.82,
+            packetWave,
           )
+
+        /* -------------------------------------------------
+           LISTENING / INFORMATION ACCENT
+           ------------------------------------------------- */
+
+        const informationAccent =
+          blueWeight
             .mul(
-              goldChance,
+              informationDensity,
+            )
+            .mul(
+              packetHead,
+            )
+            .mul(
+              0.42,
             )
 
         let color =
           mix(
+            stateColor,
             blue,
-            cyan,
-            smoothstep(
-              0.35,
-              0.90,
-              packetEnergy,
-            ),
+            informationAccent,
           )
+
+        /* -------------------------------------------------
+           EXECUTION ACCENT
+           ------------------------------------------------- */
+
+        const executionAccent =
+          goldWeight
+            .mul(
+              packetHead,
+            )
+            .mul(
+              informationSpeed,
+            )
+            .mul(
+              0.30,
+            )
 
         color =
           mix(
             color,
             gold,
-            goldMask,
+            executionAccent,
           )
 
-        /*
-         * =================================================
-         * PACKET SHAPE
-         * =================================================
-         */
+        /* -------------------------------------------------
+           ALERT ACCENT
+           ------------------------------------------------- */
+
+        const alertAccent =
+          entityUrgency
+            .mul(
+              packetHead,
+            )
+            .mul(
+              0.20,
+            )
+
+        color =
+          mix(
+            color,
+            red,
+            alertAccent,
+          )
+
+        /* -------------------------------------------------
+           PACKET ENERGY
+           ------------------------------------------------- */
+
+        const brightness =
+          float(0.10)
+            .add(
+              packetTrail.mul(
+                0.26,
+              ),
+            )
+            .add(
+              packetHead.mul(
+                0.92,
+              ),
+            )
+            .add(
+              smoothstep(
+                0.20,
+                0.95,
+                packetSpeed,
+              ).mul(
+                0.25,
+              ),
+            )
+            .mul(
+              float(0.50).add(
+                visualIntensity.mul(
+                  0.50,
+                ),
+              ),
+            )
+
+        material.colorNode =
+          color.mul(
+            brightness,
+          )
+
+        /* -------------------------------------------------
+           PACKET SHAPE
+           ------------------------------------------------- */
 
         const packetUv =
           uv()
@@ -1017,29 +1325,29 @@ export default function TSLInformationFlow() {
         const horizontal =
           smoothstep(
             0.50,
-            0.01,
+            0.015,
             local.x,
           )
 
         const vertical =
           smoothstep(
             0.50,
-            0.04,
+            0.05,
             local.y,
           )
 
         /*
-         * A travelling bright head.
+         * Head of the packet.
          */
         const head =
           smoothstep(
-            0.70,
+            0.68,
             0.98,
             packetUv.x,
           )
 
         /*
-         * Soft body/trail.
+         * Body/trail.
          */
         const body =
           smoothstep(
@@ -1048,25 +1356,9 @@ export default function TSLInformationFlow() {
             packetUv.x,
           )
 
-        const packetIntensity =
-          float(0.60)
-            .add(
-              packetEnergy.mul(
-                2.40,
-              ),
-            )
-            .add(
-              head.mul(
-                packetEnergy.mul(
-                  3.80,
-                ),
-              ),
-            )
-
-        material.colorNode =
-          color.mul(
-            packetIntensity,
-          )
+        /* -------------------------------------------------
+           OPACITY
+           ------------------------------------------------- */
 
         material.opacityNode =
           horizontal
@@ -1074,22 +1366,30 @@ export default function TSLInformationFlow() {
               vertical,
             )
             .mul(
-              float(0.22)
+              activeMask,
+            )
+            .mul(
+              float(0.10)
                 .add(
                   body.mul(
-                    0.50,
+                    0.22,
                   ),
                 )
                 .add(
                   head.mul(
-                    0.55,
+                    0.34,
+                  ),
+                )
+                .add(
+                  packetHead.mul(
+                    0.38,
                   ),
                 ),
             )
             .mul(
-              float(0.35).add(
-                packetEnergy.mul(
-                  0.85,
+              float(0.42).add(
+                visualIntensity.mul(
+                  0.46,
                 ),
               ),
             )
@@ -1103,10 +1403,15 @@ export default function TSLInformationFlow() {
         energies,
         phases,
 
-        entityEnergy,
-        entityAttention,
-        entityProcessing,
-        entityNetworkActivity,
+        redWeight,
+        blueWeight,
+        goldWeight,
+
+        visualIntensity,
+
+        informationDensity,
+        informationSpeed,
+
         entityUrgency,
       ],
     )
@@ -1179,6 +1484,10 @@ export default function TSLInformationFlow() {
     const visualState =
       getEntityVisualState()
 
+    /* ---------------------------------------------------
+       EXISTING ENTITY STATE
+       --------------------------------------------------- */
+
     entityEnergy.value =
       visualState.energy
 
@@ -1193,6 +1502,38 @@ export default function TSLInformationFlow() {
 
     entityUrgency.value =
       visualState.urgency
+
+    /* ---------------------------------------------------
+       GLOBAL VISUAL STATE
+       --------------------------------------------------- */
+
+    redWeight.value =
+      visualState.redWeight
+
+    blueWeight.value =
+      visualState.blueWeight
+
+    goldWeight.value =
+      visualState.goldWeight
+
+    visualIntensity.value =
+      visualState.intensity
+
+    visualMotion.value =
+      visualState.motion
+
+    visualTurbulence.value =
+      visualState.turbulence
+
+    informationDensity.value =
+      visualState.informationDensity
+
+    informationSpeed.value =
+      visualState.informationSpeed
+
+    /* ---------------------------------------------------
+       GPU UPDATE
+       --------------------------------------------------- */
 
     void renderer.compute(
       updatePackets,

@@ -9,6 +9,7 @@ import {
   mix,
   smoothstep,
   time,
+  uniform,
   uv,
   vec2,
   vec3,
@@ -29,11 +30,22 @@ import {
   useThree,
 } from '@react-three/fiber'
 
+import {
+  getEntityVisualState,
+} from '../state/entityStore'
+
 /* =========================================================
    CONFIG
+   =========================================================
+
+   Energy events are intentionally sparse.
+
+   They are transient computational incidents, not another
+   permanent particle field.
+
    ========================================================= */
 
-const EVENT_COUNT = 1200
+const EVENT_COUNT = 700
 
 /* =========================================================
    GPU ENERGY EVENT SYSTEM
@@ -41,7 +53,8 @@ const EVENT_COUNT = 1200
 
 export default function TSLEnergyEvents() {
 
-  const { gl } = useThree()
+  const { gl } =
+    useThree()
 
   const renderer =
     gl as unknown as THREE.WebGPURenderer
@@ -101,6 +114,58 @@ export default function TSLEnergyEvents() {
     )
 
   /* =======================================================
+     ULTRON VISUAL STATE
+     ======================================================= */
+
+  const redWeight =
+    useMemo(
+      () => uniform(0.94),
+      [],
+    )
+
+  const blueWeight =
+    useMemo(
+      () => uniform(0.05),
+      [],
+    )
+
+  const goldWeight =
+    useMemo(
+      () => uniform(0.01),
+      [],
+    )
+
+  const visualIntensity =
+    useMemo(
+      () => uniform(0.58),
+      [],
+    )
+
+  const eventDensity =
+    useMemo(
+      () => uniform(0.035),
+      [],
+    )
+
+  const eventIntensity =
+    useMemo(
+      () => uniform(0.06),
+      [],
+    )
+
+  const informationSpeed =
+    useMemo(
+      () => uniform(0.12),
+      [],
+    )
+
+  const visualMotion =
+    useMemo(
+      () => uniform(0.25),
+      [],
+    )
+
+  /* =======================================================
      INITIALIZE EVENTS
      ======================================================= */
 
@@ -113,13 +178,19 @@ export default function TSLEnergyEvents() {
             instanceIndex
 
           const r0 =
-            hash(id.add(1000))
+            hash(
+              id.add(1000),
+            )
 
           const r1 =
-            hash(id.add(1200))
+            hash(
+              id.add(1200),
+            )
 
           const r2 =
-            hash(id.add(1400))
+            hash(
+              id.add(1400),
+            )
 
           const theta =
             r0.mul(
@@ -133,13 +204,19 @@ export default function TSLEnergyEvents() {
 
           const direction =
             vec3(
+
               phi.sin()
-                .mul(theta.cos()),
+                .mul(
+                  theta.cos(),
+                ),
 
               phi.cos(),
 
               phi.sin()
-                .mul(theta.sin()),
+                .mul(
+                  theta.sin(),
+                ),
+
             ).normalize()
 
           /*
@@ -234,18 +311,24 @@ export default function TSLEnergyEvents() {
           const speed =
             speeds.element(id)
 
-          /*
-           * Radial shell coordinate.
-           */
+          /* -------------------------------------------------
+             EVENT TRAVEL
+             ------------------------------------------------- */
 
-          /*
-           * Event travels outward,
-           * then cycles back inward.
-           */
           const travel =
             time
-              .mul(speed)
-              .add(phase)
+              .mul(
+                speed.mul(
+                  float(0.82).add(
+                    informationSpeed.mul(
+                      0.75,
+                    ),
+                  ),
+                ),
+              )
+              .add(
+                phase,
+              )
               .sin()
               .mul(0.5)
               .add(0.5)
@@ -258,13 +341,18 @@ export default function TSLEnergyEvents() {
                 ),
               )
 
-          /*
-           * Small orbital deflection.
-           */
+          /* -------------------------------------------------
+             ORGANIC ORBITAL DEFLECTION
+             ------------------------------------------------- */
+
           const orbitAngle =
             time
               .mul(
-                0.65,
+                float(0.55).add(
+                  visualMotion.mul(
+                    0.30,
+                  ),
+                ),
               )
               .add(
                 phase,
@@ -280,7 +368,13 @@ export default function TSLEnergyEvents() {
                 ),
 
               orbitAngle.cos()
-                .mul(0.15),
+                .mul(
+                  float(0.10).add(
+                    visualMotion.mul(
+                      0.05,
+                    ),
+                  ),
+                ),
 
               direction.x
                 .mul(
@@ -306,14 +400,14 @@ export default function TSLEnergyEvents() {
               eventPosition,
             )
 
-          /*
-           * Energy is strongest around
-           * the middle of the event path.
-           */
+          /* -------------------------------------------------
+             EVENT ENERGY ENVELOPE
+             ------------------------------------------------- */
+
           const envelope =
             smoothstep(
-              0.02,
-              0.18,
+              0.04,
+              0.20,
               travel,
             )
               .mul(
@@ -324,32 +418,48 @@ export default function TSLEnergyEvents() {
                 ),
               )
 
-          /*
-           * Fast secondary modulation.
-           */
+          /* -------------------------------------------------
+             SMALL FLICKER
+             ------------------------------------------------- */
+
           const flicker =
-            float(0.72)
+            float(0.78)
               .add(
                 phase
                   .add(
-                    time.mul(8.0),
+                    time.mul(
+                      6.0,
+                    ),
                   )
                   .sin()
-                  .mul(0.28),
+                  .mul(
+                    0.22,
+                  ),
               )
+
+          const stateEnergy =
+            float(0.30).add(
+              eventIntensity.mul(
+                0.70,
+              ),
+            )
 
           energies
             .element(id)
             .assign(
-              envelope.mul(
-                flicker,
-              ),
+              envelope
+                .mul(
+                  flicker,
+                )
+                .mul(
+                  stateEnergy,
+                ),
             )
 
-          /*
-           * Direction changes subtly as
-           * the energy packet progresses.
-           */
+          /* -------------------------------------------------
+             DIRECTION EVOLUTION
+             ------------------------------------------------- */
+
           directions
             .element(id)
             .assign(
@@ -369,6 +479,10 @@ export default function TSLEnergyEvents() {
         phases,
         speeds,
         energies,
+
+        informationSpeed,
+        visualMotion,
+        eventIntensity,
       ],
     )
 
@@ -385,36 +499,85 @@ export default function TSLEnergyEvents() {
             transparent: true,
             depthWrite: false,
             depthTest: true,
+
             blending:
               THREE.AdditiveBlending,
-            toneMapped: false,
+
+            toneMapped:
+              false,
           })
 
         material.positionNode =
           positions.toAttribute()
 
-        /*
-         * Energy event becomes a bright
-         * elongated computational spark.
-         */
         const energy =
           energies.element(
             instanceIndex,
           )
 
+        /* -------------------------------------------------
+           EVENT IDENTITY
+           ------------------------------------------------- */
+
+        const identity =
+          hash(
+            instanceIndex.add(
+              1700,
+            ),
+          )
+
+        /*
+         * Only a fraction of the event population is
+         * visible depending on the current semantic state.
+         *
+         * Idle:
+         *   almost invisible
+         *
+         * Executing:
+         *   many more events visible
+         *
+         * Alert:
+         *   very high event density
+         */
+        const activationThreshold =
+          float(1.0)
+            .sub(
+              eventDensity,
+            )
+
+        const activeMask =
+          smoothstep(
+            activationThreshold
+              .sub(0.025),
+
+            activationThreshold
+              .add(0.01),
+
+            identity,
+          )
+
+        /* -------------------------------------------------
+           EVENT SIZE
+           ------------------------------------------------- */
+
         const length =
-          float(0.035)
+          float(0.025)
             .add(
               energy.mul(
-                0.14,
+                0.10,
+              ),
+            )
+            .add(
+              eventIntensity.mul(
+                0.025,
               ),
             )
 
         const width =
-          float(0.004)
+          float(0.0025)
             .add(
               energy.mul(
-                0.012,
+                0.006,
               ),
             )
 
@@ -424,9 +587,10 @@ export default function TSLEnergyEvents() {
             width,
           )
 
-        /*
-         * Each event continuously rotates.
-         */
+        /* -------------------------------------------------
+           EVENT ROTATION
+           ------------------------------------------------- */
+
         material.rotationNode =
           phases
             .element(
@@ -440,89 +604,130 @@ export default function TSLEnergyEvents() {
               ),
             )
 
-        /* -------------------------------------------------
-           COLOR
-           ------------------------------------------------- */
+        /* =================================================
+           SEMANTIC COLORS
+           ================================================= */
 
         const red =
           vec3(
-            1.0,
-            0.004,
-            0.012,
+            0.95,
+            0.003,
+            0.010,
           )
 
         const blue =
           vec3(
             0.005,
-            0.10,
-            0.92,
+            0.12,
+            0.96,
           )
 
         const gold =
           vec3(
-            1.0,
-            0.32,
-            0.006,
-          )
-
-        const identity =
-          hash(
-            instanceIndex.add(
-              1700,
-            ),
+            1.00,
+            0.36,
+            0.008,
           )
 
         /*
-         * Most events are red.
+         * Global ULTRON color state.
          */
-        const blueMask =
-          smoothstep(
-            0.76,
-            0.94,
-            identity,
-          )
+        const stateColor =
+          red
+            .mul(
+              redWeight,
+            )
+            .add(
+              blue.mul(
+                blueWeight,
+              ),
+            )
+            .add(
+              gold.mul(
+                goldWeight,
+              ),
+            )
 
         /*
-         * Only a very small percentage
-         * become gold.
+         * Information-heavy states get subtle blue
+         * emphasis at event peaks.
          */
-        const goldMask =
-          smoothstep(
-            0.988,
-            0.998,
-            identity,
-          )
+        const informationAccent =
+          blueWeight
+            .mul(
+              eventIntensity,
+            )
+            .mul(
+              smoothstep(
+                0.68,
+                0.95,
+                energy,
+              ),
+            )
+
+        /*
+         * Execution gets a stronger gold accent at
+         * event peaks.
+         */
+        const executionAccent =
+          goldWeight
+            .mul(
+              eventIntensity,
+            )
+            .mul(
+              smoothstep(
+                0.58,
+                0.92,
+                energy,
+              ),
+            )
 
         let color =
           mix(
-            red,
+            stateColor,
             blue,
-            blueMask,
+            informationAccent.mul(
+              0.25,
+            ),
           )
 
         color =
           mix(
             color,
             gold,
-            goldMask,
+            executionAccent.mul(
+              0.28,
+            ),
           )
 
-        /*
-         * HDR-like event intensity.
-         */
-        material.colorNode =
-          color.mul(
-            float(0.25)
-              .add(
-                energy.mul(
-                  3.2,
+        /* -------------------------------------------------
+           EVENT ENERGY
+           ------------------------------------------------- */
+
+        const brightness =
+          float(0.18)
+            .add(
+              energy.mul(
+                1.70,
+              ),
+            )
+            .mul(
+              float(0.48).add(
+                visualIntensity.mul(
+                  0.52,
                 ),
               ),
+            )
+
+        material.colorNode =
+          color.mul(
+            brightness,
           )
 
-        /*
-         * Soft spark body.
-         */
+        /* -------------------------------------------------
+           SOFT SPARK BODY
+           ------------------------------------------------- */
+
         const local =
           uv()
             .sub(0.5)
@@ -531,24 +736,42 @@ export default function TSLEnergyEvents() {
         const horizontal =
           smoothstep(
             0.50,
-            0.03,
+            0.04,
             local.x,
           )
 
         const vertical =
           smoothstep(
             0.50,
-            0.04,
+            0.05,
             local.y,
           )
 
+        /*
+         * Local event opacity.
+         *
+         * activeMask is the major clutter-control
+         * mechanism.
+         */
         material.opacityNode =
           horizontal
             .mul(
               vertical,
             )
             .mul(
-              energy,
+              energy.mul(
+                0.70,
+              ),
+            )
+            .mul(
+              activeMask,
+            )
+            .mul(
+              float(0.25).add(
+                visualIntensity.mul(
+                  0.50,
+                ),
+              ),
             )
 
         return material
@@ -559,11 +782,20 @@ export default function TSLEnergyEvents() {
         phases,
         speeds,
         energies,
+
+        redWeight,
+        blueWeight,
+        goldWeight,
+
+        visualIntensity,
+
+        eventDensity,
+        eventIntensity,
       ],
     )
 
   /* =======================================================
-     GPU EVENT MESH
+     EVENT MESH
      ======================================================= */
 
   const eventMesh =
@@ -595,7 +827,7 @@ export default function TSLEnergyEvents() {
     )
 
   /* =======================================================
-     INITIALIZE
+     INITIALIZE GPU STATE
      ======================================================= */
 
   const initialized =
@@ -627,6 +859,49 @@ export default function TSLEnergyEvents() {
 
   useFrame(() => {
 
+    const visualState =
+      getEntityVisualState()
+
+    /* ---------------------------------------------------
+       COLOR STATE
+       --------------------------------------------------- */
+
+    redWeight.value =
+      visualState.redWeight
+
+    blueWeight.value =
+      visualState.blueWeight
+
+    goldWeight.value =
+      visualState.goldWeight
+
+    /* ---------------------------------------------------
+       GLOBAL INTENSITY
+       --------------------------------------------------- */
+
+    visualIntensity.value =
+      visualState.intensity
+
+    /* ---------------------------------------------------
+       EVENT BEHAVIOR
+       --------------------------------------------------- */
+
+    eventDensity.value =
+      visualState.eventDensity
+
+    eventIntensity.value =
+      visualState.eventIntensity
+
+    informationSpeed.value =
+      visualState.informationSpeed
+
+    visualMotion.value =
+      visualState.motion
+
+    /* ---------------------------------------------------
+       GPU UPDATE
+       --------------------------------------------------- */
+
     void renderer.compute(
       updateEvents,
     )
@@ -652,9 +927,13 @@ export default function TSLEnergyEvents() {
     eventMaterial,
   ])
 
+  /* =======================================================
+     OUTPUT
+     ======================================================= */
+
   return (
     <primitive
       object={eventMesh}
     />
   )
-}   
+}
