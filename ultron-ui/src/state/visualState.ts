@@ -12,7 +12,10 @@ import type { UltronMode } from './entityState'
    BLUE  = listening / information
    GOLD  = execution / high-value activity
 
-   Other visual systems consume these values later.
+   The geometry and simulation remain chaotic and organic.
+   Visual intensity is controlled separately so we can reduce
+   clutter without removing the underlying simulation.
+
    ========================================================= */
 
 export interface UltronVisualProfile {
@@ -91,12 +94,12 @@ const PROFILES:
      ------------------------------------------------------- */
 
   starting: {
-    redWeight: 0.72,
+    redWeight: 0.76,
     blueWeight: 0.08,
-    goldWeight: 0.20,
+    goldWeight: 0.16,
 
-    intensity: 0.78,
-    coreGlow: 0.82,
+    intensity: 0.62,
+    coreGlow: 0.70,
 
     motion: 0.40,
     turbulence: 0.30,
@@ -104,8 +107,8 @@ const PROFILES:
     informationDensity: 0.15,
     informationSpeed: 0.25,
 
-    eventDensity: 0.12,
-    eventIntensity: 0.25,
+    eventDensity: 0.10,
+    eventIntensity: 0.20,
   },
 
   /* -------------------------------------------------------
@@ -114,7 +117,8 @@ const PROFILES:
 
      ULTRON's default identity.
 
-     RED DOMINATES.
+     Deep red dominates.
+     Motion remains calm but alive.
      */
 
   idle: {
@@ -122,8 +126,8 @@ const PROFILES:
     blueWeight: 0.05,
     goldWeight: 0.01,
 
-    intensity: 0.72,
-    coreGlow: 0.82,
+    intensity: 0.58,
+    coreGlow: 0.68,
 
     motion: 0.25,
     turbulence: 0.18,
@@ -131,25 +135,28 @@ const PROFILES:
     informationDensity: 0.08,
     informationSpeed: 0.12,
 
-    eventDensity: 0.04,
-    eventIntensity: 0.08,
+    eventDensity: 0.035,
+    eventIntensity: 0.06,
   },
 
   /* -------------------------------------------------------
      LISTENING
      -------------------------------------------------------
 
-     BLUE becomes dominant because ULTRON is receiving
-     information from the user.
+     BLUE becomes dominant because ULTRON is actively
+     receiving information.
+
+     Red still exists underneath so the entity never loses
+     its core identity.
      */
 
   listening: {
-    redWeight: 0.12,
-    blueWeight: 0.84,
+    redWeight: 0.08,
+    blueWeight: 0.88,
     goldWeight: 0.04,
 
-    intensity: 0.82,
-    coreGlow: 0.90,
+    intensity: 0.64,
+    coreGlow: 0.74,
 
     motion: 0.38,
     turbulence: 0.22,
@@ -157,8 +164,8 @@ const PROFILES:
     informationDensity: 0.68,
     informationSpeed: 0.58,
 
-    eventDensity: 0.08,
-    eventIntensity: 0.12,
+    eventDensity: 0.06,
+    eventIntensity: 0.10,
   },
 
   /* -------------------------------------------------------
@@ -167,17 +174,20 @@ const PROFILES:
 
      Red + blue interference.
 
-     This should visually feel like ULTRON is working
-     through a problem rather than simply changing color.
+     This should feel like active cognition rather than
+     a simple color change.
+
+     The reduced intensity prevents the mixture from
+     becoming excessively white or pink.
      */
 
   thinking: {
     redWeight: 0.43,
-    blueWeight: 0.49,
-    goldWeight: 0.08,
+    blueWeight: 0.50,
+    goldWeight: 0.07,
 
-    intensity: 0.94,
-    coreGlow: 1.00,
+    intensity: 0.70,
+    coreGlow: 0.82,
 
     motion: 0.72,
     turbulence: 0.66,
@@ -185,8 +195,8 @@ const PROFILES:
     informationDensity: 0.82,
     informationSpeed: 0.82,
 
-    eventDensity: 0.18,
-    eventIntensity: 0.30,
+    eventDensity: 0.14,
+    eventIntensity: 0.24,
   },
 
   /* -------------------------------------------------------
@@ -195,16 +205,18 @@ const PROFILES:
 
      GOLD dominates.
 
-     This represents heavy active execution.
+     Execution should feel powerful and intense, but retain
+     a rich molten-gold appearance rather than clipping
+     toward pure white.
      */
 
   executing: {
-    redWeight: 0.10,
-    blueWeight: 0.16,
-    goldWeight: 0.74,
+    redWeight: 0.08,
+    blueWeight: 0.12,
+    goldWeight: 0.80,
 
-    intensity: 1.00,
-    coreGlow: 1.15,
+    intensity: 0.78,
+    coreGlow: 0.92,
 
     motion: 0.92,
     turbulence: 0.88,
@@ -212,24 +224,27 @@ const PROFILES:
     informationDensity: 0.92,
     informationSpeed: 0.96,
 
-    eventDensity: 0.52,
-    eventIntensity: 0.78,
+    eventDensity: 0.42,
+    eventIntensity: 0.62,
   },
 
   /* -------------------------------------------------------
      ALERT
      -------------------------------------------------------
 
-     Red returns aggressively, with gold warning energy.
+     Aggressive red returns with controlled gold warning
+     energy.
+
+     High motion remains intact.
      */
 
   alert: {
-    redWeight: 0.78,
+    redWeight: 0.80,
     blueWeight: 0.03,
-    goldWeight: 0.19,
+    goldWeight: 0.17,
 
-    intensity: 1.12,
-    coreGlow: 1.25,
+    intensity: 0.84,
+    coreGlow: 0.98,
 
     motion: 0.96,
     turbulence: 1.00,
@@ -237,8 +252,8 @@ const PROFILES:
     informationDensity: 0.74,
     informationSpeed: 0.88,
 
-    eventDensity: 0.82,
-    eventIntensity: 1.00,
+    eventDensity: 0.68,
+    eventIntensity: 0.82,
   },
 
   /* -------------------------------------------------------
@@ -246,6 +261,9 @@ const PROFILES:
      -------------------------------------------------------
 
      Concentrated red + blue cognitive state.
+
+     Less intense than the previous profile so the
+     computational structure remains readable.
      */
 
   focus: {
@@ -253,8 +271,8 @@ const PROFILES:
     blueWeight: 0.41,
     goldWeight: 0.04,
 
-    intensity: 0.98,
-    coreGlow: 1.08,
+    intensity: 0.76,
+    coreGlow: 0.88,
 
     motion: 0.64,
     turbulence: 0.48,
@@ -262,8 +280,8 @@ const PROFILES:
     informationDensity: 0.74,
     informationSpeed: 0.72,
 
-    eventDensity: 0.16,
-    eventIntensity: 0.24,
+    eventDensity: 0.14,
+    eventIntensity: 0.20,
   },
 
   /* -------------------------------------------------------
@@ -275,8 +293,8 @@ const PROFILES:
     blueWeight: 0.01,
     goldWeight: 0.0,
 
-    intensity: 0.16,
-    coreGlow: 0.20,
+    intensity: 0.12,
+    coreGlow: 0.16,
 
     motion: 0.04,
     turbulence: 0.02,

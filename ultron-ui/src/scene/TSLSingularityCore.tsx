@@ -292,9 +292,9 @@ export default function TSLSingularityCore() {
          * the central ULTRON visual-state controller.
          */
         const energy =
-          float(0.55)
+          float(0.42)
             .add(
-              plasma.mul(1.55),
+              plasma.mul(1.15),
             )
             .mul(
               breathing,

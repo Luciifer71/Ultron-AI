@@ -1,28 +1,110 @@
-import { useFrame } from '@react-three/fiber'
-import { updateEntitySimulation } from './entitySimulation'
+import {
+  useEffect,
+} from 'react'
 
-/* =========================================================
-   ULTRON SIMULATION RUNTIME
+import {
+  useFrame,
+} from '@react-three/fiber'
 
-   Runs the central entity simulation every rendered frame.
-
-   This component intentionally renders nothing.
-   It exists only to drive ULTRON's semantic simulation clock.
-   ========================================================= */
+import {
+  setUltronMode,
+  updateEntitySimulation,
+} from './entitySimulation'
 
 export default function SimulationRuntime() {
 
-  useFrame((_, delta) => {
+  useEffect(() => {
 
-    /*
-     * Prevent a huge simulation jump after tab switching
-     * or temporary frame stalls.
-     */
-    const dt =
-      Math.min(delta, 0.05)
+    const handleKeyDown =
+      (event: KeyboardEvent) => {
 
-    updateEntitySimulation(dt)
-  })
+        let mode:
+          | 'idle'
+          | 'listening'
+          | 'thinking'
+          | 'executing'
+          | 'alert'
+          | 'focus'
+          | 'sleep'
+          | null = null
+
+        switch (event.key) {
+
+          case '1':
+            mode = 'idle'
+            break
+
+          case '2':
+            mode = 'listening'
+            break
+
+          case '3':
+            mode = 'thinking'
+            break
+
+          case '4':
+            mode = 'executing'
+            break
+
+          case '5':
+            mode = 'alert'
+            break
+
+          case '6':
+            mode = 'focus'
+            break
+
+          case '7':
+            mode = 'sleep'
+            break
+        }
+
+        if (!mode) {
+          return
+        }
+
+        setUltronMode(mode)
+
+        console.log(
+          '[ULTRON MODE]',
+          mode,
+        )
+      }
+
+    window.addEventListener(
+      'keydown',
+      handleKeyDown,
+    )
+
+    console.log(
+      '[ULTRON] Keyboard mode controller active',
+    )
+
+    return () => {
+
+      window.removeEventListener(
+        'keydown',
+        handleKeyDown,
+      )
+
+    }
+
+  }, [])
+
+  useFrame(
+    (_, delta) => {
+
+      const dt =
+        Math.min(
+          delta,
+          0.05,
+        )
+
+      updateEntitySimulation(
+        dt,
+      )
+    },
+  )
 
   return null
 }

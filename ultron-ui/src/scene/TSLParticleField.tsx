@@ -1,7 +1,12 @@
 import * as THREE from 'three/webgpu'
+
 import {
   SpriteNodeMaterial,
 } from 'three/webgpu'
+
+import {
+  getEntityVisualState,
+} from '../state/entityStore'
 
 import {
   Fn,
@@ -10,10 +15,10 @@ import {
   hash,
   instanceIndex,
   instancedArray,
-  mix,
   smoothstep,
   step,
   time,
+  uniform,
   uv,
   vec2,
   vec3,
@@ -48,13 +53,51 @@ export default function TSLParticleField() {
   const renderer =
     gl as unknown as THREE.WebGPURenderer
 
-  /*
-   * GPU storage buffers.
-   *
-   * Every particle owns:
-   * position = vec3
-   * velocity = vec3
-   */
+  /* =======================================================
+     ULTRON VISUAL STATE
+     ======================================================= */
+
+  const redWeight =
+    useMemo(
+      () => uniform(0.94),
+      [],
+    )
+
+  const blueWeight =
+    useMemo(
+      () => uniform(0.05),
+      [],
+    )
+
+  const goldWeight =
+    useMemo(
+      () => uniform(0.01),
+      [],
+    )
+
+  const visualIntensity =
+    useMemo(
+      () => uniform(0.72),
+      [],
+    )
+
+  const visualMotion =
+    useMemo(
+      () => uniform(0.25),
+      [],
+    )
+
+  /* =======================================================
+     GPU STORAGE
+     =======================================================
+
+     Every particle owns:
+
+       position = vec3
+       velocity = vec3
+
+     ======================================================= */
+
   const positions =
     useMemo(
       () =>
@@ -105,14 +148,14 @@ export default function TSLParticleField() {
             )
 
           const theta =
-            randomA
-              .mul(
-                Math.PI * 2,
-              )
+            randomA.mul(
+              Math.PI * 2,
+            )
 
           const phi =
-            randomB
-              .mul(Math.PI)
+            randomB.mul(
+              Math.PI,
+            )
 
           const radius =
             float(0.75)
@@ -160,11 +203,15 @@ export default function TSLParticleField() {
 
           positions
             .element(id)
-            .assign(position)
+            .assign(
+              position,
+            )
 
           velocities
             .element(id)
-            .assign(velocity)
+            .assign(
+              velocity,
+            )
 
         })().compute(
           PARTICLE_COUNT,
@@ -197,8 +244,7 @@ export default function TSLParticleField() {
             position.length()
 
           const radial =
-            position
-              .normalize()
+            position.normalize()
 
           /*
            * Primary vortex.
@@ -224,9 +270,6 @@ export default function TSLParticleField() {
 
           /*
            * Procedural turbulence.
-           *
-           * This is deliberately inexpensive
-           * for our first compute layer.
            */
           const turbulence =
             vec3(
@@ -291,36 +334,90 @@ export default function TSLParticleField() {
               .sin()
 
           /*
+           * ------------------------------------------------
+           * ULTRON STATE-DRIVEN MOTION
+           * ------------------------------------------------
+           *
+           * Idle:
+           *   calm particle motion
+           *
+           * Listening:
+           *   particles become more responsive
+           *
+           * Thinking:
+           *   stronger motion
+           *
+           * Executing:
+           *   aggressive motion
+           */
+          const motionBoost =
+            float(0.72)
+              .add(
+                visualMotion.mul(
+                  0.55,
+                ),
+              )
+
+          /*
            * Combined vector field.
            */
           const force =
-            vortex.mul(0.72)
+            vortex
+              .mul(
+                motionBoost,
+              )
+
               .add(
                 secondaryVortex.mul(
-                  0.20,
+                  float(0.20)
+                    .add(
+                      visualMotion.mul(
+                        0.18,
+                      ),
+                    ),
                 ),
               )
+
               .add(
                 turbulence.mul(
-                  0.24,
+                  float(0.24)
+                    .add(
+                      visualMotion.mul(
+                        0.22,
+                      ),
+                    ),
                 ),
               )
+
               .add(
                 radial.mul(
                   coreRepulsion
-                    .mul(0.72),
+                    .mul(
+                      0.72,
+                    ),
                 ),
               )
+
               .sub(
                 radial.mul(
                   outerConfinement
-                    .mul(1.55),
+                    .mul(
+                      float(1.55)
+                        .add(
+                          visualMotion.mul(
+                            0.30,
+                          ),
+                        ),
+                    ),
                 ),
               )
+
               .add(
                 radial.mul(
                   breathingShell
-                    .mul(0.055),
+                    .mul(
+                      0.055,
+                    ),
                 ),
               )
 
@@ -334,7 +431,9 @@ export default function TSLParticleField() {
                   deltaTime,
                 ),
               )
-              .mul(0.992)
+              .mul(
+                0.992,
+              )
 
           /*
            * Integrate position.
@@ -364,6 +463,11 @@ export default function TSLParticleField() {
       [
         positions,
         velocities,
+
+        /*
+         * ULTRON visual state.
+         */
+        visualMotion,
       ],
     )
 
@@ -372,152 +476,229 @@ export default function TSLParticleField() {
      ======================================================= */
 
   const material =
-    useMemo(() => {
+    useMemo(
+      () => {
 
-      const particleMaterial =
-        new SpriteNodeMaterial()
+        const particleMaterial =
+          new SpriteNodeMaterial()
 
-      particleMaterial.transparent =
-        true
+        particleMaterial.transparent =
+          true
 
-      particleMaterial.depthWrite =
-        false
+        particleMaterial.depthWrite =
+          false
 
-      particleMaterial.blending =
-        THREE.AdditiveBlending
+        particleMaterial.blending =
+          THREE.AdditiveBlending
 
-      particleMaterial.toneMapped =
-        false
+        particleMaterial.toneMapped =
+          false
 
-      /*
-       * GPU-computed position.
-       */
-      particleMaterial.positionNode =
-        positions.toAttribute()
+        /*
+         * GPU-computed position.
+         */
+        particleMaterial.positionNode =
+          positions.toAttribute()
 
-      /*
-       * Individual particle size.
-       */
-      const particleSize =
-        float(0.018).add(
+        /*
+         * -------------------------------------------------
+         * PARTICLE SIZE
+         * -------------------------------------------------
+         */
+
+        const baseSize =
+          float(0.018)
+            .add(
+              hash(
+                instanceIndex,
+              ).mul(0.030),
+            )
+
+        const sizeBoost =
+          float(0.72)
+            .add(
+              visualIntensity.mul(
+                0.45,
+              ),
+            )
+
+        const particleSize =
+          baseSize.mul(
+            sizeBoost,
+          )
+
+        particleMaterial.scaleNode =
+          vec2(
+            particleSize,
+          )
+
+        /*
+         * -------------------------------------------------
+         * VELOCITY BRIGHTNESS
+         * -------------------------------------------------
+         */
+
+        const speed =
+          velocities
+            .toAttribute()
+            .length()
+
+        /*
+         * -------------------------------------------------
+         * ULTRON COLORS
+         * -------------------------------------------------
+         *
+         * These are now SEMANTIC.
+         *
+         * redWeight:
+         *   ULTRON / computation
+         *
+         * blueWeight:
+         *   listening / information
+         *
+         * goldWeight:
+         *   execution / high-value activity
+         * -------------------------------------------------
+         */
+
+        const red =
+          vec3(
+            1.0,
+            0.004,
+            0.012,
+          )
+
+        const blue =
+          vec3(
+            0.005,
+            0.08,
+            0.85,
+          )
+
+        const gold =
+          vec3(
+            1.0,
+            0.32,
+            0.008,
+          )
+
+        /*
+         * Global semantic color field.
+         *
+         * Unlike the old system, particles are no longer
+         * permanently assigned random red/blue/gold colors.
+         */
+        const stateColor =
+          red
+            .mul(
+              redWeight,
+            )
+            .add(
+              blue.mul(
+                blueWeight,
+              ),
+            )
+            .add(
+              gold.mul(
+                goldWeight,
+              ),
+            )
+
+        /*
+         * Preserve a little natural particle variation
+         * without allowing randomness to override the
+         * current ULTRON state.
+         */
+        const colorSeed =
           hash(
-            instanceIndex,
-          ).mul(0.030),
-        )
+            instanceIndex.add(71),
+          )
 
-      particleMaterial.scaleNode =
-        vec2(
-          particleSize,
-        )
+        const identityVariation =
+          float(0.78)
+            .add(
+              colorSeed.mul(
+                0.22,
+              ),
+            )
 
-      /*
-       * Velocity-dependent brightness.
-       */
-      const speed =
-        velocities
-          .toAttribute()
-          .length()
+        const color =
+          stateColor.mul(
+            identityVariation,
+          )
 
-      /*
-       * RED = primary
-       * BLUE = secondary
-       */
-      const red =
-        vec3(
-          1.0,
-          0.004,
-          0.012,
-        )
+        /*
+         * -------------------------------------------------
+         * ENERGY
+         * -------------------------------------------------
+         */
 
-      const blue =
-        vec3(
-          0.005,
-          0.08,
-          0.85,
-        )
-
-      const gold =
-        vec3(
-          1.0,
-          0.32,
-          0.008,
-        )
-
-      const colorSeed =
-        hash(
-          instanceIndex.add(71),
-        )
-
-      const blueAmount =
-        smoothstep(
-          0.62,
-          0.92,
-          colorSeed,
-        )
-
-      const goldAmount =
-        smoothstep(
-          0.985,
-          1.0,
-          colorSeed,
-        )
-
-      let color =
-        mix(
-          red,
-          blue,
-          blueAmount.mul(0.72),
-        )
-
-      color =
-        mix(
-          color,
-          gold,
-          goldAmount,
-        )
-
-      /*
-       * Bright particles respond to
-       * velocity.
-       */
-      const energy =
-        float(0.35).add(
+        const velocityEnergy =
           smoothstep(
             0.20,
             1.05,
             speed,
-          ).mul(0.95),
-        )
+          )
 
-      particleMaterial.colorNode =
-        color.mul(
-          energy,
-        )
+        const energy =
+          float(0.30)
+            .add(
+              velocityEnergy.mul(
+                0.95,
+              ),
+            )
+            .mul(
+              float(0.55)
+                .add(
+                  visualIntensity.mul(
+                    0.70,
+                  ),
+                ),
+            )
 
-      /*
-       * Circular soft particle.
-       */
-      const circle =
-        step(
-          uv()
-            .sub(0.5)
-            .length(),
-          0.5,
-        )
+        particleMaterial.colorNode =
+          color.mul(
+            energy,
+          )
 
-      particleMaterial.opacityNode =
-        circle.mul(
-          float(0.32).add(
-            energy.mul(0.42),
-          ),
-        )
+        /*
+         * -------------------------------------------------
+         * SOFT PARTICLE
+         * -------------------------------------------------
+         */
 
-      return particleMaterial
+        const circle =
+          step(
+            uv()
+              .sub(0.5)
+              .length(),
+            0.5,
+          )
 
-    }, [
-      positions,
-      velocities,
-    ])
+        particleMaterial.opacityNode =
+          circle.mul(
+            float(0.25)
+              .add(
+                energy.mul(
+                  0.46,
+                ),
+              ),
+          )
+
+        return particleMaterial
+
+      },
+      [
+        positions,
+        velocities,
+
+        redWeight,
+        blueWeight,
+        goldWeight,
+
+        visualIntensity,
+      ],
+    )
 
   /* =======================================================
      MESH
@@ -588,6 +769,39 @@ export default function TSLParticleField() {
 
   useFrame(() => {
 
+    /*
+     * Read the live semantic ULTRON state.
+     */
+    const visualState =
+      getEntityVisualState()
+
+    /*
+     * Update color composition.
+     */
+    redWeight.value =
+      visualState.redWeight
+
+    blueWeight.value =
+      visualState.blueWeight
+
+    goldWeight.value =
+      visualState.goldWeight
+
+    /*
+     * Update global visual intensity.
+     */
+    visualIntensity.value =
+      visualState.intensity
+
+    /*
+     * Update particle motion.
+     */
+    visualMotion.value =
+      visualState.motion
+
+    /*
+     * Continue GPU simulation.
+     */
     renderer.compute(
       updateParticles,
     )
@@ -612,6 +826,10 @@ export default function TSLParticleField() {
     particleMesh,
     material,
   ])
+
+  /* =======================================================
+     OUTPUT
+     ======================================================= */
 
   return (
     <primitive

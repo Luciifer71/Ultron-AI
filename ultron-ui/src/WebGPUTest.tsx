@@ -1,4 +1,5 @@
 import * as THREE from 'three/webgpu'
+
 import TSLParticleField
   from './scene/TSLParticleField'
 
@@ -26,6 +27,10 @@ import {
 
 export default function WebGPUTest() {
 
+  console.log(
+    '[ULTRON] WebGPUTest MOUNTED',
+  )
+
   return (
     <div
       style={{
@@ -52,7 +57,8 @@ export default function WebGPUTest() {
             new THREE.WebGPURenderer({
               ...(props as THREE.WebGPURendererParameters),
 
-              antialias: true,
+              antialias:
+                true,
 
               powerPreference:
                 'high-performance',
@@ -74,13 +80,20 @@ export default function WebGPUTest() {
         }}
       >
 
+        <SimulationRuntime />
+
         <TSLSingularityCore />
-<TSLParticleField />
-<TSLCircuitField />
-<TSLComputationalShell />
-<TSLInformationFlow />
-<TSLEnergyEvents />
-<SimulationRuntime />
+
+        <TSLParticleField />
+
+        <TSLCircuitField />
+
+        <TSLComputationalShell />
+
+        <TSLInformationFlow />
+
+        <TSLEnergyEvents />
+
       </Canvas>
 
     </div>

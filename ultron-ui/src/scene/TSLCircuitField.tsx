@@ -1,5 +1,8 @@
 import * as THREE from 'three/webgpu'
 
+import {
+  SpriteNodeMaterial,
+} from 'three/webgpu'
 
 import {
   Fn,
@@ -18,14 +21,6 @@ import {
 } from 'three/tsl'
 
 import {
-  SpriteNodeMaterial,
-} from 'three/webgpu'
-
-import {
-  getEntityVisualState,
-} from '../state/entityStore'
-
-import {
   useEffect,
   useMemo,
   useRef,
@@ -36,34 +31,16 @@ import {
   useThree,
 } from '@react-three/fiber'
 
+import {
+  getEntityVisualState,
+} from '../state/entityStore'
+
 /* =========================================================
    CONFIG
    ========================================================= */
 
-const FRAGMENT_COUNT = 5000
-const NODE_COUNT = 900
-
-/* =========================================================
-   TSL CURL-NOISE APPROXIMATION
-   ========================================================= */
-
-/*
- * TSL in the installed Three.js version does not expose
- * curlNoise() through the TypeScript API we are using.
- *
- * We therefore construct a rotational vector field from
- * finite differences of simplex noise.
- *
- * Conceptually:
- *
- *       scalar noise field
- *              ↓
- *        spatial gradient
- *              ↓
- *      rotational vector field
- *
- * This gives us fluid-like motion without hard-coded curves.
- */
+const FRAGMENT_COUNT = 4200
+const NODE_COUNT = 700
 
 /* =========================================================
    GPU CIRCUIT FIELD
@@ -130,41 +107,103 @@ export default function TSLCircuitField() {
         ),
       [],
     )
-/* =======================================================
-   ULTRON ENTITY STATE
-   ======================================================= */
 
-const entityActivity =
-  useMemo(
-    () => uniform(0.20),
-    [],
-  )
-
-const entityAttention =
-  useMemo(
-    () => uniform(0.35),
-    [],
-  )
-
-const entityProcessing =
-  useMemo(
-    () => uniform(0.10),
-    [],
-  )
-
-const entityEnergy =
-  useMemo(
-    () => uniform(0.55),
-    [],
-  )
-
-const entityNetworkActivity =
-  useMemo(
-    () => uniform(0.05),
-    [],
-  )
   /* =======================================================
-     GPU INITIALIZATION
+     ULTRON ENTITY STATE
+     ======================================================= */
+
+  const entityActivity =
+    useMemo(
+      () => uniform(0.20),
+      [],
+    )
+
+  const entityAttention =
+    useMemo(
+      () => uniform(0.35),
+      [],
+    )
+
+  const entityProcessing =
+    useMemo(
+      () => uniform(0.10),
+      [],
+    )
+
+  const entityEnergy =
+    useMemo(
+      () => uniform(0.55),
+      [],
+    )
+
+  const entityNetworkActivity =
+    useMemo(
+      () => uniform(0.05),
+      [],
+    )
+
+  /* =======================================================
+     GLOBAL VISUAL STATE
+     ======================================================= */
+
+  /*
+   * These are the new semantic visual controls.
+   *
+   * RED  = ULTRON / computation
+   * BLUE = listening / information
+   * GOLD = execution / high-value activity
+   */
+
+  const redWeight =
+    useMemo(
+      () => uniform(0.94),
+      [],
+    )
+
+  const blueWeight =
+    useMemo(
+      () => uniform(0.05),
+      [],
+    )
+
+  const goldWeight =
+    useMemo(
+      () => uniform(0.01),
+      [],
+    )
+
+  const visualIntensity =
+    useMemo(
+      () => uniform(0.72),
+      [],
+    )
+
+  const visualMotion =
+    useMemo(
+      () => uniform(0.25),
+      [],
+    )
+
+  const visualTurbulence =
+    useMemo(
+      () => uniform(0.18),
+      [],
+    )
+
+  const informationDensity =
+    useMemo(
+      () => uniform(0.08),
+      [],
+    )
+
+  const informationSpeed =
+    useMemo(
+      () => uniform(0.12),
+      [],
+    )
+
+  /* =======================================================
+     FRAGMENT INITIALIZATION
      ======================================================= */
 
   const initializeFragments =
@@ -205,9 +244,7 @@ const entityNetworkActivity =
 
           const radius =
             float(0.72).add(
-              randomC.mul(
-                1.15,
-              ),
+              randomC.mul(1.15),
             )
 
           const sinPhi =
@@ -239,16 +276,12 @@ const entityNetworkActivity =
 
           const speed =
             float(0.18).add(
-              randomD.mul(
-                0.82,
-              ),
+              randomD.mul(0.82),
             )
 
           const length =
             float(0.025).add(
-              randomC.mul(
-                0.15,
-              ),
+              randomC.mul(0.15),
             )
 
           positions
@@ -296,1319 +329,1519 @@ const entityNetworkActivity =
         lengths,
       ],
     )
-/* =======================================================
-   GPU DYNAMIC SIMULATION
-   ======================================================= */
 
-const updateFragments =
-  useMemo(
-    () =>
-      Fn(() => {
+  /* =======================================================
+     FRAGMENT SIMULATION
+     ======================================================= */
 
-        const id =
-          instanceIndex
+  const updateFragments =
+    useMemo(
+      () =>
+        Fn(() => {
 
-        const position =
-          positions.element(id)
+          const id =
+            instanceIndex
 
-        const velocity =
-          velocities.element(id)
+          const position =
+            positions.element(id)
 
-        const phase =
-          phases.element(id)
+          const velocity =
+            velocities.element(id)
 
-        const speed =
-          speeds.element(id)
+          const phase =
+            phases.element(id)
 
-        const radius =
-          position.length()
+          const speed =
+            speeds.element(id)
 
-        const radial =
-          position.normalize()
+          const radius =
+            position.length()
 
-        /*
-         * Main vortex.
-         *
-         * ULTRON activity increases the rotational
-         * intensity of the computational field.
-         */
-        const vortex =
-          vec3(
-            position.z.negate(),
-            float(0),
-            position.x,
-          ).normalize()
+          const radial =
+            position.normalize()
 
-        /*
-         * Secondary 3D flow.
-         */
-        const vortex2 =
-          vec3(
-            position.y.negate(),
-            position.z,
-            position.x.negate(),
-          ).normalize()
+          /* -------------------------------------------------
+             PRIMARY COMPUTATIONAL VORTEX
+             ------------------------------------------------- */
 
-        /*
-         * Procedural rotational turbulence.
-         */
-        const fieldTime =
-          time.mul(0.35)
+          const vortex =
+            vec3(
+              position.z.negate(),
+              float(0),
+              position.x,
+            ).normalize()
 
-        const turbulence =
-          vec3(
-            position.y
-              .mul(3.7)
-              .add(fieldTime)
-              .sin()
-              .add(
-                position.z
-                  .mul(2.1)
-                  .sub(
-                    fieldTime.mul(0.7),
-                  )
-                  .cos()
-                  .mul(0.5),
+          /* -------------------------------------------------
+             SECONDARY 3D FLOW
+             ------------------------------------------------- */
+
+          const vortex2 =
+            vec3(
+              position.y.negate(),
+              position.z,
+              position.x.negate(),
+            ).normalize()
+
+          /* -------------------------------------------------
+             PROCEDURAL TURBULENCE
+             ------------------------------------------------- */
+
+          const fieldTime =
+            time.mul(
+              float(0.24).add(
+                visualMotion.mul(
+                  0.38,
+                ),
               ),
-
-            position.z
-              .mul(4.1)
-              .sub(
-                fieldTime.mul(0.8),
-              )
-              .sin()
-              .add(
-                position.x
-                  .mul(2.7)
-                  .add(fieldTime)
-                  .cos()
-                  .mul(0.5),
-              ),
-
-            position.x
-              .mul(4.8)
-              .add(
-                fieldTime.mul(0.6),
-              )
-              .sin()
-              .add(
-                position.y
-                  .mul(3.2)
-                  .sub(fieldTime)
-                  .cos()
-                  .mul(0.5),
-              ),
-          ).normalize()
-
-        /*
-         * Moving energy wave.
-         */
-        const wave =
-          time
-            .mul(1.25)
-            .add(phase)
-            .add(
-              radius.mul(4.2),
             )
-            .sin()
 
-        /*
-         * Central repulsion.
-         */
-        const coreRepulsion =
-          float(1).sub(
-            smoothstep(
-              0.38,
-              0.78,
-              radius,
-            ),
-          )
+          const turbulence =
+            vec3(
 
-        /*
-         * Outer confinement.
-         */
-        const outerConfinement =
-          smoothstep(
-            1.70,
-            2.20,
-            radius,
-          )
-
-        /*
-         * Breathing shell.
-         */
-        const breathing =
-          time
-            .mul(0.55)
-            .add(phase)
-            .sin()
-            .mul(0.10)
-
-        const targetRadius =
-          float(1.35).add(
-            breathing,
-          )
-
-        const radialCorrection =
-          targetRadius
-            .sub(radius)
-            .mul(0.72)
-
-        /*
-         * ===================================================
-         * COMBINED ULTRON VECTOR FIELD
-         * ===================================================
-         *
-         * activity
-         *     -> increases global motion
-         *
-         * processing
-         *     -> increases turbulence
-         *
-         * networkActivity
-         *     -> increases information-flow velocity
-         */
-        const force =
-          vortex
-            .mul(
-              float(0.85)
+              position.y
+                .mul(3.7)
+                .add(fieldTime)
+                .sin()
                 .add(
-                  speed.mul(0.32),
+                  position.z
+                    .mul(2.1)
+                    .sub(
+                      fieldTime.mul(0.7),
+                    )
+                    .cos()
+                    .mul(0.5),
+                ),
+
+              position.z
+                .mul(4.1)
+                .sub(
+                  fieldTime.mul(0.8),
                 )
+                .sin()
                 .add(
-                  entityActivity.mul(
-                    0.45,
+                  position.x
+                    .mul(2.7)
+                    .add(fieldTime)
+                    .cos()
+                    .mul(0.5),
+                ),
+
+              position.x
+                .mul(4.8)
+                .add(
+                  fieldTime.mul(0.6),
+                )
+                .sin()
+                .add(
+                  position.y
+                    .mul(3.2)
+                    .sub(fieldTime)
+                    .cos()
+                    .mul(0.5),
+                ),
+
+            ).normalize()
+
+          /* -------------------------------------------------
+             MOVING COMPUTATIONAL WAVE
+             ------------------------------------------------- */
+
+          const wave =
+            time
+              .mul(
+                float(0.75).add(
+                  informationSpeed.mul(
+                    1.5,
                   ),
                 ),
+              )
+              .add(phase)
+              .add(
+                radius.mul(4.2),
+              )
+              .sin()
+
+          /* -------------------------------------------------
+             CORE REPULSION
+             ------------------------------------------------- */
+
+          const coreRepulsion =
+            float(1).sub(
+              smoothstep(
+                0.38,
+                0.78,
+                radius,
+              ),
             )
 
-            .add(
-              vortex2.mul(0.24),
+          /* -------------------------------------------------
+             OUTER CONFINEMENT
+             ------------------------------------------------- */
+
+          const outerConfinement =
+            smoothstep(
+              1.70,
+              2.20,
+              radius,
             )
 
-            .add(
-              turbulence.mul(
-                float(0.42).add(
-                  entityProcessing.mul(
+          /* -------------------------------------------------
+             BREATHING SHELL
+             ------------------------------------------------- */
+
+          const breathing =
+            time
+              .mul(
+                float(0.40).add(
+                  visualMotion.mul(
                     0.35,
                   ),
                 ),
-              ),
-            )
-
-            .add(
-              radial.mul(
-                radialCorrection,
-              ),
-            )
-
-            .add(
-              radial.mul(
-                coreRepulsion.mul(
-                  1.2,
-                ),
-              ),
-            )
-
-            .sub(
-              radial.mul(
-                outerConfinement.mul(
-                  1.8,
-                ),
-              ),
-            )
-
-            .add(
-              radial.mul(
-                wave.mul(0.06),
-              ),
-            )
-
-        /*
-         * ===================================================
-         * VELOCITY INTEGRATION
-         * ===================================================
-         *
-         * Network activity accelerates the computational
-         * information field.
-         */
-        const newVelocity =
-          velocity
-            .add(
-              force
-                .mul(
-                  deltaTime,
-                )
-                .mul(
-                  float(1.0).add(
-                    entityNetworkActivity.mul(
-                      0.75,
-                    ),
+              )
+              .add(phase)
+              .sin()
+              .mul(
+                float(0.05).add(
+                  visualTurbulence.mul(
+                    0.08,
                   ),
                 ),
+              )
+
+          const targetRadius =
+            float(1.35).add(
+              breathing,
             )
-            .mul(0.986)
 
-        /*
-         * Integrate position.
-         */
-        const newPosition =
-          position.add(
-            newVelocity.mul(
-              deltaTime,
-            ),
-          )
+          const radialCorrection =
+            targetRadius
+              .sub(radius)
+              .mul(0.72)
 
-        /*
-         * Prevent collapse into core.
-         */
-        const safePosition =
-          mix(
-            newPosition,
+          /* -------------------------------------------------
+             VISUAL-STATE DRIVEN MOTION
+             ------------------------------------------------- */
 
-            newPosition
-              .normalize()
-              .mul(0.62),
-
-            smoothstep(
-              0.20,
-              0.62,
-              float(0.62)
-                .sub(
-                  newPosition.length(),
+          const motionDrive =
+            float(0.62)
+              .add(
+                visualMotion.mul(
+                  0.85,
                 ),
-            ),
-          )
-
-        /*
-         * Boundary confinement.
-         */
-        const boundedPosition =
-          mix(
-            safePosition,
-
-            safePosition
-              .normalize()
-              .mul(1.82),
-
-            smoothstep(
-              1.72,
-              2.18,
-              safePosition.length(),
-            ),
-          )
-
-        /*
-         * Store GPU position.
-         */
-        positions
-          .element(id)
-          .assign(
-            boundedPosition,
-          )
-
-        /*
-         * Store GPU velocity.
-         */
-        velocities
-          .element(id)
-          .assign(
-            newVelocity,
-          )
-
-        /*
-         * ===================================================
-         * EVOLVING FRAGMENT IDENTITY
-         * ===================================================
-         *
-         * Network activity changes the rate at which
-         * fragments evolve through their phase space.
-         */
-        phases
-          .element(id)
-          .assign(
-            phase.add(
-              deltaTime.mul(
-                speed.mul(
-                  float(1.0).add(
-                    entityNetworkActivity.mul(
-                      0.85,
-                    ),
-                  ),
+              )
+              .add(
+                entityActivity.mul(
+                  0.25,
                 ),
-              ),
-            ),
-          )
+              )
 
-        /*
-         * Dynamic fragment length.
-         */
-        const newLength =
-          lengths
-            .element(id)
-            .mul(0.992)
-            .add(
-              float(0.025).mul(
-                smoothstep(
-                  0.35,
+          const turbulenceDrive =
+            float(0.24)
+              .add(
+                visualTurbulence.mul(
+                  0.58,
+                ),
+              )
+              .add(
+                entityProcessing.mul(
+                  0.18,
+                ),
+              )
+
+          const networkDrive =
+            float(0.85)
+              .add(
+                informationSpeed.mul(
                   1.15,
-                  speed,
-                ),
-              ),
-            )
-
-        lengths
-          .element(id)
-          .assign(
-            newLength.clamp(
-              0.018,
-              0.18,
-            ),
-          )
-
-      })().compute(
-        FRAGMENT_COUNT,
-      ),
-    [
-      positions,
-      velocities,
-      phases,
-      speeds,
-      lengths,
-
-      /*
-       * ULTRON semantic state.
-       */
-      entityActivity,
-      entityProcessing,
-      entityNetworkActivity,
-    ],
-  )
-/* =======================================================
-   GPU FRAGMENT MATERIAL
-   ======================================================= */
-
-const fragmentMaterial =
-  useMemo(
-    () => {
-
-      const material =
-        new SpriteNodeMaterial({
-          transparent: true,
-          depthWrite: false,
-          depthTest: true,
-          blending:
-            THREE.AdditiveBlending,
-          toneMapped: false,
-        })
-
-      material.positionNode =
-        positions.toAttribute()
-
-      /*
-       * Dynamic length / width.
-       */
-      const length =
-        lengths.element(
-          instanceIndex,
-        )
-
-      const width =
-        float(0.004).add(
-          hash(
-            instanceIndex.add(71),
-          ).mul(0.007),
-        )
-
-      /*
-       * ---------------------------------------------------
-       * COLORS
-       * ---------------------------------------------------
-       */
-
-      const red =
-        vec3(
-          1.0,
-          0.004,
-          0.012,
-        )
-
-      const blue =
-        vec3(
-          0.005,
-          0.07,
-          0.85,
-        )
-
-      const gold =
-        vec3(
-          1.0,
-          0.30,
-          0.006,
-        )
-
-      const identity =
-        hash(
-          instanceIndex.add(113),
-        )
-
-      const blueMask =
-        smoothstep(
-          0.70,
-          0.93,
-          identity,
-        )
-
-      const goldMask =
-        smoothstep(
-          0.982,
-          0.999,
-          identity,
-        )
-
-      let color =
-        mix(
-          red,
-          blue,
-          blueMask.mul(0.72),
-        )
-
-      color =
-        mix(
-          color,
-          gold,
-          goldMask,
-        )
-
-      /*
-       * ---------------------------------------------------
-       * INFORMATION FLOW
-       * ---------------------------------------------------
-       */
-
-      const fragmentPosition =
-        positions.element(
-          instanceIndex,
-        )
-
-      const informationDrive =
-        entityNetworkActivity
-          .mul(0.60)
-          .add(
-            entityAttention.mul(
-              0.25,
-            ),
-          )
-          .add(
-            entityEnergy.mul(
-              0.15,
-            ),
-          )
-
-      /*
-       * Spatial flow coordinate.
-       */
-      const flowCoordinate =
-        fragmentPosition.x
-          .mul(1.7)
-          .add(
-            fragmentPosition.y.mul(
-              2.1,
-            ),
-          )
-          .add(
-            fragmentPosition.z.mul(
-              1.3,
-            ),
-          )
-
-      /*
-       * Packet speed reacts to ULTRON's
-       * network activity.
-       */
-      const packetSpeed =
-        float(0.70).add(
-          informationDrive.mul(
-            2.0,
-          ),
-        )
-
-      /*
-       * Travelling information packet.
-       */
-      const packetPhase =
-        time
-          .mul(packetSpeed)
-          .add(
-            flowCoordinate.mul(
-              2.2,
-            ),
-          )
-          .add(
-            phases
-              .element(
-                instanceIndex,
-              )
-              .mul(0.35),
-          )
-
-      const packetWave =
-        packetPhase
-          .sin()
-          .mul(0.5)
-          .add(0.5)
-
-      /*
-       * Fading packet trail.
-       */
-      const packetTrail =
-        smoothstep(
-          0.38,
-          0.82,
-          packetWave,
-        )
-
-      /*
-       * Bright packet head.
-       */
-      const packetHead =
-        smoothstep(
-          0.80,
-          0.995,
-          packetWave,
-        )
-
-      /*
-       * Only blue information fragments participate.
-       * Gold remains a special event color.
-       */
-      const informationPulse =
-        blueMask
-          .mul(
-            float(1).sub(
-              goldMask,
-            ),
-          )
-          .mul(
-            informationDrive,
-          )
-          .mul(
-            float(0.18)
-              .add(
-                packetTrail.mul(
-                  0.35,
                 ),
               )
               .add(
-                packetHead.mul(
-                  1.80,
-                ),
-              ),
-          )
-
-      /*
-       * Bright packet heads stretch slightly.
-       */
-      const animatedLength =
-        length.mul(
-          float(1.0).add(
-            packetHead.mul(
-              0.65,
-            ),
-          ),
-        )
-
-      material.scaleNode =
-        vec2(
-          animatedLength,
-          width,
-        )
-
-      /*
-       * Dynamic rotation.
-       */
-      material.rotationNode =
-        phases
-          .element(
-            instanceIndex,
-          )
-          .add(
-            time.mul(
-              speeds.element(
-                instanceIndex,
-              ),
-            ),
-          )
-
-      /*
-       * Add information energy.
-       */
-      color =
-        color.add(
-          blue.mul(
-            informationPulse,
-          ),
-        )
-
-      /*
-       * Velocity-driven brightness.
-       */
-      const velocity =
-        velocities.element(
-          instanceIndex,
-        )
-
-      const speed =
-        velocity.length()
-
-      const energy =
-        float(0.20)
-          .add(
-            smoothstep(
-              0.18,
-              0.95,
-              speed,
-            ).mul(1.10),
-          )
-          .add(
-            informationPulse.mul(
-              0.80,
-            ),
-          )
-
-      material.colorNode =
-        color.mul(
-          energy,
-        )
-
-      /*
-       * Soft rectangular fragment.
-       */
-      const fragmentUv =
-        uv()
-          .sub(0.5)
-          .abs()
-
-      const horizontalFade =
-        smoothstep(
-          0.5,
-          0.05,
-          fragmentUv.x,
-        )
-
-      const verticalFade =
-        smoothstep(
-          0.5,
-          0.05,
-          fragmentUv.y,
-        )
-
-      material.opacityNode =
-        horizontalFade
-          .mul(
-            verticalFade,
-          )
-          .mul(
-            float(0.35)
-              .add(
-                energy.mul(
-                  0.45,
+                entityNetworkActivity.mul(
+                  0.30,
                 ),
               )
+
+          /* -------------------------------------------------
+             VECTOR FIELD
+             ------------------------------------------------- */
+
+          const force =
+            vortex
+              .mul(
+                motionDrive
+                  .add(
+                    speed.mul(
+                      0.24,
+                    ),
+                  ),
+              )
+
               .add(
-                packetHead.mul(
-                  0.45,
+                vortex2.mul(
+                  float(0.14).add(
+                    visualMotion.mul(
+                      0.20,
+                    ),
+                  ),
                 ),
-              ),
-          )
+              )
 
-      return material
+              .add(
+                turbulence.mul(
+                  turbulenceDrive,
+                ),
+              )
 
-    },
-    [
-      positions,
-      velocities,
-      phases,
-      speeds,
-      lengths,
+              .add(
+                radial.mul(
+                  radialCorrection,
+                ),
+              )
 
-      entityAttention,
-      entityEnergy,
-      entityNetworkActivity,
-    ],
-  )
+              .add(
+                radial.mul(
+                  coreRepulsion.mul(
+                    1.2,
+                  ),
+                ),
+              )
 
-/* =======================================================
-   NODE FIELD
-   ======================================================= */
-
-const nodePositions =
-  useMemo(
-    () =>
-      instancedArray(
-        NODE_COUNT,
-        'vec3',
-      ),
-    [],
-  )
-
-const nodeVelocities =
-  useMemo(
-    () =>
-      instancedArray(
-        NODE_COUNT,
-        'vec3',
-      ),
-    [],
-  )
-
-const initializeNodes =
-  useMemo(
-    () =>
-      Fn(() => {
-
-        const id =
-          instanceIndex
-
-        const a =
-          hash(
-            id.add(200),
-          )
-
-        const b =
-          hash(
-            id.add(400),
-          )
-
-        const c =
-          hash(
-            id.add(600),
-          )
-
-        const theta =
-          a.mul(
-            Math.PI * 2,
-          )
-
-        const phi =
-          b.mul(
-            Math.PI,
-          )
-
-        const radius =
-          float(0.72).add(
-            c.mul(1.0),
-          )
-
-        const sinPhi =
-          phi.sin()
-
-        const position =
-          vec3(
-            sinPhi
-              .mul(theta.cos())
-              .mul(radius),
-
-            phi.cos()
-              .mul(radius),
-
-            sinPhi
-              .mul(theta.sin())
-              .mul(radius),
-          )
-
-        nodePositions
-          .element(id)
-          .assign(
-            position,
-          )
-
-        nodeVelocities
-          .element(id)
-          .assign(
-            vec3(
-              0,
-              0,
-              0,
-            ),
-          )
-
-      })().compute(
-        NODE_COUNT,
-      ),
-    [
-      nodePositions,
-      nodeVelocities,
-    ],
-  )
-
-const updateNodes =
-  useMemo(
-    () =>
-      Fn(() => {
-
-        const id =
-          instanceIndex
-
-        const position =
-          nodePositions.element(
-            id,
-          )
-
-        const velocity =
-          nodeVelocities.element(
-            id,
-          )
-
-        const radial =
-          position.normalize()
-
-        const nodeTime =
-          time.mul(0.22)
-
-        const turbulence =
-          vec3(
-            position.y
-              .mul(2.8)
-              .add(nodeTime)
-              .sin(),
-
-            position.z
-              .mul(3.4)
               .sub(
-                nodeTime.mul(0.8),
+                radial.mul(
+                  outerConfinement.mul(
+                    float(1.45).add(
+                      visualMotion.mul(
+                        0.45,
+                      ),
+                    ),
+                  ),
+                ),
               )
-              .cos(),
 
-            position.x
-              .mul(3.1)
               .add(
-                nodeTime.mul(0.6),
+                radial.mul(
+                  wave.mul(
+                    float(0.035).add(
+                      informationDensity.mul(
+                        0.05,
+                      ),
+                    ),
+                  ),
+                ),
               )
-              .sin(),
-          ).normalize()
 
-        const vortex =
-          vec3(
-            position.z.negate(),
-            position.y.mul(0.20),
-            position.x,
-          ).normalize()
+          /* -------------------------------------------------
+             VELOCITY INTEGRATION
+             ------------------------------------------------- */
 
-        const force =
-          turbulence
-            .mul(0.18)
-
-            .add(
-              vortex.mul(0.48),
-            )
-
-            .add(
-              radial.mul(
-                float(1.20)
-                  .sub(
-                    position.length(),
+          const newVelocity =
+            velocity
+              .add(
+                force
+                  .mul(
+                    deltaTime,
                   )
-                  .mul(0.44),
-              ),
-            )
+                  .mul(
+                    networkDrive,
+                  ),
+              )
+              .mul(
+                float(0.990).sub(
+                  visualMotion.mul(
+                    0.008,
+                  ),
+                ),
+              )
 
-        const newVelocity =
-          velocity
-            .add(
-              force.mul(
+          /* -------------------------------------------------
+             POSITION INTEGRATION
+             ------------------------------------------------- */
+
+          const newPosition =
+            position.add(
+              newVelocity.mul(
                 deltaTime,
               ),
             )
-            .mul(0.975)
 
-        const newPosition =
-          position.add(
-            newVelocity.mul(
-              deltaTime,
-            ),
-          )
+          /* -------------------------------------------------
+             CORE PROTECTION
+             ------------------------------------------------- */
 
-        nodePositions
-          .element(id)
-          .assign(
+          const safePosition =
             mix(
               newPosition,
 
               newPosition
                 .normalize()
-                .mul(1.85),
+                .mul(0.62),
 
               smoothstep(
-                1.70,
-                2.15,
-                newPosition.length(),
+                0.20,
+                0.62,
+                float(0.62)
+                  .sub(
+                    newPosition.length(),
+                  ),
+              ),
+            )
+
+          /* -------------------------------------------------
+             BOUNDARY CONFINEMENT
+             ------------------------------------------------- */
+
+          const boundedPosition =
+            mix(
+              safePosition,
+
+              safePosition
+                .normalize()
+                .mul(1.82),
+
+              smoothstep(
+                1.72,
+                2.18,
+                safePosition.length(),
+              ),
+            )
+
+          positions
+            .element(id)
+            .assign(
+              boundedPosition,
+            )
+
+          velocities
+            .element(id)
+            .assign(
+              newVelocity,
+            )
+
+          /* -------------------------------------------------
+             EVOLVING CIRCUIT PHASE
+             ------------------------------------------------- */
+
+          phases
+            .element(id)
+            .assign(
+              phase.add(
+                deltaTime.mul(
+                  speed.mul(
+                    networkDrive,
+                  ),
+                ),
+              ),
+            )
+
+          /* -------------------------------------------------
+             DYNAMIC FRAGMENT LENGTH
+             ------------------------------------------------- */
+
+          const newLength =
+            lengths
+              .element(id)
+              .mul(0.992)
+              .add(
+                float(0.025).mul(
+                  smoothstep(
+                    0.35,
+                    1.15,
+                    speed,
+                  ),
+                ),
+              )
+
+          lengths
+            .element(id)
+            .assign(
+              newLength.clamp(
+                0.018,
+                0.18,
+              ),
+            )
+
+        })().compute(
+          FRAGMENT_COUNT,
+        ),
+      [
+        positions,
+        velocities,
+        phases,
+        speeds,
+        lengths,
+
+        entityActivity,
+        entityProcessing,
+        entityNetworkActivity,
+
+        visualMotion,
+        visualTurbulence,
+        informationDensity,
+        informationSpeed,
+      ],
+    )
+
+  /* =======================================================
+     FRAGMENT MATERIAL
+     ======================================================= */
+
+  const fragmentMaterial =
+    useMemo(
+      () => {
+
+        const material =
+          new SpriteNodeMaterial({
+            transparent: true,
+            depthWrite: false,
+            depthTest: true,
+            blending:
+              THREE.AdditiveBlending,
+            toneMapped: false,
+          })
+
+        material.positionNode =
+          positions.toAttribute()
+
+        const length =
+          lengths.element(
+            instanceIndex,
+          )
+
+        const width =
+          float(0.0035).add(
+            hash(
+              instanceIndex.add(71),
+            ).mul(0.0055),
+          )
+
+        /* -------------------------------------------------
+           SEMANTIC COLORS
+           ------------------------------------------------- */
+
+        const red =
+          vec3(
+            1.0,
+            0.004,
+            0.012,
+          )
+
+        const blue =
+          vec3(
+            0.005,
+            0.08,
+            0.95,
+          )
+
+        const gold =
+          vec3(
+            1.0,
+            0.40,
+            0.008,
+          )
+
+        /*
+         * The global visual state is now the primary
+         * source of the circuit color.
+         */
+        const baseColor =
+          red
+            .mul(
+              redWeight,
+            )
+            .add(
+              blue.mul(
+                blueWeight,
+              ),
+            )
+            .add(
+              gold.mul(
+                goldWeight,
+              ),
+            )
+
+        /* -------------------------------------------------
+           INFORMATION FLOW
+           ------------------------------------------------- */
+
+        const fragmentPosition =
+          positions.element(
+            instanceIndex,
+          )
+
+        const informationDrive =
+          entityNetworkActivity
+            .mul(0.50)
+            .add(
+              entityAttention.mul(
+                0.20,
+              ),
+            )
+            .add(
+              informationDensity.mul(
+                0.20,
+              ),
+            )
+            .add(
+              entityEnergy.mul(
+                0.10,
+              ),
+            )
+
+        const flowCoordinate =
+          fragmentPosition.x
+            .mul(1.7)
+            .add(
+              fragmentPosition.y.mul(
+                2.1,
+              ),
+            )
+            .add(
+              fragmentPosition.z.mul(
+                1.3,
+              ),
+            )
+
+        const packetSpeed =
+          float(0.45).add(
+            informationSpeed.mul(
+              2.40,
+            ),
+          )
+
+        const packetPhase =
+          time
+            .mul(packetSpeed)
+            .add(
+              flowCoordinate.mul(
+                2.2,
+              ),
+            )
+            .add(
+              phases
+                .element(
+                  instanceIndex,
+                )
+                .mul(0.35),
+            )
+
+        const packetWave =
+          packetPhase
+            .sin()
+            .mul(0.5)
+            .add(0.5)
+
+        const packetTrail =
+          smoothstep(
+            0.38,
+            0.82,
+            packetWave,
+          )
+
+        const packetHead =
+          smoothstep(
+            0.80,
+            0.995,
+            packetWave,
+          )
+
+        /*
+         * Blue information activity is now controlled
+         * by the listening/thinking visual state.
+         */
+        const informationPulse =
+          blueWeight
+            .mul(
+              informationDensity,
+            )
+            .mul(
+              informationDrive,
+            )
+            .mul(
+              float(0.08)
+                .add(
+                  packetTrail.mul(
+                    0.20,
+                  ),
+                )
+                .add(
+                  packetHead.mul(
+                    1.10,
+                  ),
+                ),
+            )
+
+        /*
+         * Gold activity becomes visible during execution.
+         */
+        const executionPulse =
+          goldWeight
+            .mul(
+              smoothstep(
+                0.72,
+                0.98,
+                informationDensity,
+              ),
+            )
+            .mul(
+              packetHead.mul(
+                0.55,
+              ),
+            )
+
+        let color =
+          mix(
+            baseColor,
+            blue,
+            informationPulse.mul(
+              0.45,
+            ),
+          )
+
+        color =
+          mix(
+            color,
+            gold,
+            executionPulse.mul(
+              0.55,
+            ),
+          )
+
+        /* -------------------------------------------------
+           DYNAMIC PACKET LENGTH
+           ------------------------------------------------- */
+
+        const animatedLength =
+          length.mul(
+            float(1.0).add(
+              packetHead.mul(
+                0.45,
               ),
             ),
           )
 
-        nodeVelocities
-          .element(id)
-          .assign(
-            newVelocity,
+        material.scaleNode =
+          vec2(
+            animatedLength,
+            width,
           )
 
-      })().compute(
-        NODE_COUNT,
-      ),
-    [
-      nodePositions,
-      nodeVelocities,
-    ],
-  )
-/* =======================================================
-   NODE MATERIAL
-   ======================================================= */
+        /* -------------------------------------------------
+           ROTATION
+           ------------------------------------------------- */
 
-const nodeMaterial =
-  useMemo(
-    () => {
+        material.rotationNode =
+          phases
+            .element(
+              instanceIndex,
+            )
+            .add(
+              time.mul(
+                speeds.element(
+                  instanceIndex,
+                ),
+              ),
+            )
 
-      const material =
-        new SpriteNodeMaterial({
-          transparent: true,
-          depthWrite: false,
-          depthTest: true,
-          blending:
-            THREE.AdditiveBlending,
-          toneMapped: false,
-        })
+        /* -------------------------------------------------
+           VELOCITY ENERGY
+           ------------------------------------------------- */
 
-      material.positionNode =
-        nodePositions.toAttribute()
-
-      const nodePosition =
-        nodePositions.element(
-          instanceIndex,
-        )
-
-      /*
-       * Node pulse follows the same information field
-       * as the circuit fragments.
-       */
-      const nodeFlow =
-        nodePosition.x
-          .mul(1.4)
-          .add(
-            nodePosition.y.mul(
-              1.8,
-            ),
-          )
-          .add(
-            nodePosition.z.mul(
-              1.2,
-            ),
+        const velocity =
+          velocities.element(
+            instanceIndex,
           )
 
-      const nodePulsePhase =
-        time
-          .mul(
-            float(0.65).add(
-              entityNetworkActivity.mul(
+        const speed =
+          velocity.length()
+
+        const energy =
+          float(0.16)
+            .add(
+              smoothstep(
+                0.18,
+                0.95,
+                speed,
+              ).mul(
+                0.95,
+              ),
+            )
+            .add(
+              informationPulse.mul(
+                0.65,
+              ),
+            )
+            .add(
+              visualIntensity.mul(
+                0.45,
+              ),
+            )
+
+        material.colorNode =
+          color.mul(
+            energy,
+          )
+
+        /* -------------------------------------------------
+           SOFT RECTANGULAR FRAGMENT
+           ------------------------------------------------- */
+
+        const fragmentUv =
+          uv()
+            .sub(0.5)
+            .abs()
+
+        const horizontalFade =
+          smoothstep(
+            0.5,
+            0.05,
+            fragmentUv.x,
+          )
+
+        const verticalFade =
+          smoothstep(
+            0.5,
+            0.05,
+            fragmentUv.y,
+          )
+
+        material.opacityNode =
+          horizontalFade
+            .mul(
+              verticalFade,
+            )
+            .mul(
+              float(0.14)
+                .add(
+                  energy.mul(
+                    0.24,
+                  ),
+                )
+                .add(
+                  packetHead.mul(
+                    0.35,
+                  ),
+                ),
+            )
+            .mul(
+              visualIntensity,
+            )
+
+        return material
+
+      },
+      [
+        positions,
+        velocities,
+        phases,
+        speeds,
+        lengths,
+
+        entityAttention,
+        entityEnergy,
+        entityNetworkActivity,
+
+        redWeight,
+        blueWeight,
+        goldWeight,
+
+        visualIntensity,
+
+        informationDensity,
+        informationSpeed,
+      ],
+    )
+
+  /* =======================================================
+     NODE FIELD
+     ======================================================= */
+
+  const nodePositions =
+    useMemo(
+      () =>
+        instancedArray(
+          NODE_COUNT,
+          'vec3',
+        ),
+      [],
+    )
+
+  const nodeVelocities =
+    useMemo(
+      () =>
+        instancedArray(
+          NODE_COUNT,
+          'vec3',
+        ),
+      [],
+    )
+
+  const initializeNodes =
+    useMemo(
+      () =>
+        Fn(() => {
+
+          const id =
+            instanceIndex
+
+          const a =
+            hash(
+              id.add(200),
+            )
+
+          const b =
+            hash(
+              id.add(400),
+            )
+
+          const c =
+            hash(
+              id.add(600),
+            )
+
+          const theta =
+            a.mul(
+              Math.PI * 2,
+            )
+
+          const phi =
+            b.mul(
+              Math.PI,
+            )
+
+          const radius =
+            float(0.72).add(
+              c.mul(1.0),
+            )
+
+          const sinPhi =
+            phi.sin()
+
+          const position =
+            vec3(
+              sinPhi
+                .mul(theta.cos())
+                .mul(radius),
+
+              phi.cos()
+                .mul(radius),
+
+              sinPhi
+                .mul(theta.sin())
+                .mul(radius),
+            )
+
+          nodePositions
+            .element(id)
+            .assign(
+              position,
+            )
+
+          nodeVelocities
+            .element(id)
+            .assign(
+              vec3(
+                0,
+                0,
+                0,
+              ),
+            )
+
+        })().compute(
+          NODE_COUNT,
+        ),
+      [
+        nodePositions,
+        nodeVelocities,
+      ],
+    )
+
+  /* =======================================================
+     NODE SIMULATION
+     ======================================================= */
+
+  const updateNodes =
+    useMemo(
+      () =>
+        Fn(() => {
+
+          const id =
+            instanceIndex
+
+          const position =
+            nodePositions.element(
+              id,
+            )
+
+          const velocity =
+            nodeVelocities.element(
+              id,
+            )
+
+          const radial =
+            position.normalize()
+
+          const nodeTime =
+            time.mul(
+              float(0.16).add(
+                visualMotion.mul(
+                  0.28,
+                ),
+              ),
+            )
+
+          const turbulence =
+            vec3(
+
+              position.y
+                .mul(2.8)
+                .add(nodeTime)
+                .sin(),
+
+              position.z
+                .mul(3.4)
+                .sub(
+                  nodeTime.mul(0.8),
+                )
+                .cos(),
+
+              position.x
+                .mul(3.1)
+                .add(
+                  nodeTime.mul(0.6),
+                )
+                .sin(),
+
+            ).normalize()
+
+          const vortex =
+            vec3(
+              position.z.negate(),
+              position.y.mul(0.20),
+              position.x,
+            ).normalize()
+
+          const nodeMotion =
+            float(0.30).add(
+              visualMotion.mul(
+                0.65,
+              ),
+            )
+
+          const force =
+            turbulence
+              .mul(
+                float(0.10).add(
+                  visualTurbulence.mul(
+                    0.40,
+                  ),
+                ),
+              )
+
+              .add(
+                vortex.mul(
+                  float(0.30).add(
+                    nodeMotion,
+                  ),
+                ),
+              )
+
+              .add(
+                radial.mul(
+                  float(1.20)
+                    .sub(
+                      position.length(),
+                    )
+                    .mul(0.44),
+                ),
+              )
+
+          const newVelocity =
+            velocity
+              .add(
+                force.mul(
+                  deltaTime,
+                ),
+              )
+              .mul(
+                float(0.980).sub(
+                  visualMotion.mul(
+                    0.006,
+                  ),
+                ),
+              )
+
+          const newPosition =
+            position.add(
+              newVelocity.mul(
+                deltaTime,
+              ),
+            )
+
+          nodePositions
+            .element(id)
+            .assign(
+              mix(
+                newPosition,
+
+                newPosition
+                  .normalize()
+                  .mul(1.85),
+
+                smoothstep(
+                  1.70,
+                  2.15,
+                  newPosition.length(),
+                ),
+              ),
+            )
+
+          nodeVelocities
+            .element(id)
+            .assign(
+              newVelocity,
+            )
+
+        })().compute(
+          NODE_COUNT,
+        ),
+      [
+        nodePositions,
+        nodeVelocities,
+
+        visualMotion,
+        visualTurbulence,
+      ],
+    )
+
+  /* =======================================================
+     NODE MATERIAL
+     ======================================================= */
+
+  const nodeMaterial =
+    useMemo(
+      () => {
+
+        const material =
+          new SpriteNodeMaterial({
+            transparent: true,
+            depthWrite: false,
+            depthTest: true,
+            blending:
+              THREE.AdditiveBlending,
+            toneMapped: false,
+          })
+
+        material.positionNode =
+          nodePositions.toAttribute()
+
+        const nodePosition =
+          nodePositions.element(
+            instanceIndex,
+          )
+
+        /* -------------------------------------------------
+           NODE INFORMATION FLOW
+           ------------------------------------------------- */
+
+        const nodeFlow =
+          nodePosition.x
+            .mul(1.4)
+            .add(
+              nodePosition.y.mul(
                 1.8,
               ),
-            ),
-          )
-          .add(
-            nodeFlow.mul(2.0),
-          )
+            )
+            .add(
+              nodePosition.z.mul(
+                1.2,
+              ),
+            )
 
-      const nodeWave =
-        nodePulsePhase
-          .sin()
-          .mul(0.5)
-          .add(0.5)
+        const nodePulsePhase =
+          time
+            .mul(
+              float(0.40).add(
+                informationSpeed.mul(
+                  1.80,
+                ),
+              ),
+            )
+            .add(
+              nodeFlow.mul(2.0),
+            )
 
-      const nodePulse =
-        smoothstep(
-          0.78,
-          0.995,
-          nodeWave,
-        )
+        const nodeWave =
+          nodePulsePhase
+            .sin()
+            .mul(0.5)
+            .add(0.5)
 
-      const size =
-        float(0.010)
-          .add(
-            hash(
-              instanceIndex.add(900),
-            ).mul(0.026),
-          )
-          .add(
-            nodePulse.mul(
-              0.018,
-            ),
-          )
-
-      material.scaleNode =
-        vec2(
-          size,
-          size,
-        )
-
-      /*
-       * COLORS
-       */
-      const red =
-        vec3(
-          1.0,
-          0.006,
-          0.015,
-        )
-
-      const blue =
-        vec3(
-          0.01,
-          0.10,
-          0.95,
-        )
-
-      const gold =
-        vec3(
-          1.0,
-          0.32,
-          0.01,
-        )
-
-      const selector =
-        hash(
-          instanceIndex.add(1000),
-        )
-
-      let color =
-        mix(
-          red,
-          blue,
+        const nodePulse =
           smoothstep(
-            0.68,
-            0.96,
-            selector,
-          ),
-        )
+            0.78,
+            0.995,
+            nodeWave,
+          )
 
-      color =
-        mix(
-          color,
-          gold,
-          smoothstep(
-            0.989,
+        /* -------------------------------------------------
+           NODE SIZE
+           ------------------------------------------------- */
+
+        const size =
+          float(0.008)
+            .add(
+              hash(
+                instanceIndex.add(900),
+              ).mul(0.020),
+            )
+            .add(
+              nodePulse.mul(
+                informationDensity.mul(
+                  0.020,
+                ),
+              ),
+            )
+
+        material.scaleNode =
+          vec2(
+            size,
+            size,
+          )
+
+        /* -------------------------------------------------
+           SEMANTIC NODE COLORS
+           ------------------------------------------------- */
+
+        const red =
+          vec3(
             1.0,
-            selector,
-          ),
-        )
+            0.006,
+            0.015,
+          )
 
-      /*
-       * Blue information burst.
-       */
-      color =
-        color.add(
-          blue.mul(
-            nodePulse
-              .mul(
-                entityNetworkActivity,
-              )
-              .mul(2.2),
-          ),
-        )
+        const blue =
+          vec3(
+            0.01,
+            0.10,
+            0.98,
+          )
 
-      material.colorNode =
-        color.mul(
-          float(1.35).add(
-            nodePulse.mul(
-              1.6,
+        const gold =
+          vec3(
+            1.0,
+            0.42,
+            0.01,
+          )
+
+        const baseColor =
+          red
+            .mul(
+              redWeight,
+            )
+            .add(
+              blue.mul(
+                blueWeight,
+              ),
+            )
+            .add(
+              gold.mul(
+                goldWeight,
+              ),
+            )
+
+        /* -------------------------------------------------
+           INFORMATION / EXECUTION BURSTS
+           ------------------------------------------------- */
+
+        const informationBurst =
+          blueWeight
+            .mul(
+              informationDensity,
+            )
+            .mul(
+              nodePulse,
+            )
+            .mul(1.35)
+
+        const executionBurst =
+          goldWeight
+            .mul(
+              nodePulse,
+            )
+            .mul(0.75)
+
+        let color =
+          mix(
+            baseColor,
+            blue,
+            informationBurst.mul(
+              0.45,
             ),
-          ),
-        )
+          )
 
-      material.opacityNode =
-        float(0.60).add(
-          nodePulse.mul(
-            0.30,
-          ),
-        )
+        color =
+          mix(
+            color,
+            gold,
+            executionBurst.mul(
+              0.55,
+            ),
+          )
 
-      return material
+        /* -------------------------------------------------
+           NODE OUTPUT
+           ------------------------------------------------- */
 
-    },
-    [
-      nodePositions,
-      entityNetworkActivity,
-    ],
-  )
+        material.colorNode =
+          color.mul(
+            float(0.75)
+              .add(
+                visualIntensity.mul(
+                  0.65,
+                ),
+              )
+              .add(
+                nodePulse.mul(
+                  visualIntensity.mul(
+                    0.90,
+                  ),
+                ),
+              ),
+          )
 
-/* =======================================================
-   RENDER OBJECTS
-   ======================================================= */
+        material.opacityNode =
+          float(0.20)
+            .add(
+              visualIntensity.mul(
+                0.36,
+              ),
+            )
+            .add(
+              nodePulse.mul(
+                informationDensity.mul(
+                  0.45,
+                ),
+              ),
+            )
 
-const fragmentMesh =
-  useMemo(
-    () => {
+        return material
 
-      const geometry =
-        new THREE.PlaneGeometry(
-          1,
-          1,
-        )
+      },
+      [
+        nodePositions,
 
-      const mesh =
-        new THREE.InstancedMesh(
-          geometry,
-          fragmentMaterial,
-          FRAGMENT_COUNT,
-        )
+        redWeight,
+        blueWeight,
+        goldWeight,
 
-      mesh.frustumCulled =
-        false
+        visualIntensity,
 
-      return mesh
+        informationDensity,
+        informationSpeed,
+      ],
+    )
 
-    },
-    [
-      fragmentMaterial,
-    ],
-  )
+  /* =======================================================
+     RENDER OBJECTS
+     ======================================================= */
 
-const nodeMesh =
-  useMemo(
-    () => {
+  const fragmentMesh =
+    useMemo(
+      () => {
 
-      const geometry =
-        new THREE.PlaneGeometry(
-          1,
-          1,
-        )
+        const geometry =
+          new THREE.PlaneGeometry(
+            1,
+            1,
+          )
 
-      const mesh =
-        new THREE.InstancedMesh(
-          geometry,
-          nodeMaterial,
-          NODE_COUNT,
-        )
+        const mesh =
+          new THREE.InstancedMesh(
+            geometry,
+            fragmentMaterial,
+            FRAGMENT_COUNT,
+          )
 
-      mesh.frustumCulled =
-        false
+        mesh.frustumCulled =
+          false
 
-      return mesh
+        return mesh
 
-    },
-    [
-      nodeMaterial,
-    ],
-  )
+      },
+      [
+        fragmentMaterial,
+      ],
+    )
 
-/* =======================================================
-   GPU INITIALIZATION
-   ======================================================= */
+  const nodeMesh =
+    useMemo(
+      () => {
 
-const initialized =
-  useRef(false)
+        const geometry =
+          new THREE.PlaneGeometry(
+            1,
+            1,
+          )
 
-useEffect(() => {
+        const mesh =
+          new THREE.InstancedMesh(
+            geometry,
+            nodeMaterial,
+            NODE_COUNT,
+          )
 
-  if (
-    initialized.current
-  ) {
-    return
-  }
+        mesh.frustumCulled =
+          false
 
-  initialized.current =
-    true
+        return mesh
 
-  void renderer.computeAsync(
+      },
+      [
+        nodeMaterial,
+      ],
+    )
+
+  /* =======================================================
+     GPU INITIALIZATION
+     ======================================================= */
+
+  const initialized =
+    useRef(false)
+
+  useEffect(() => {
+
+    if (
+      initialized.current
+    ) {
+      return
+    }
+
+    initialized.current =
+      true
+
+    void renderer.computeAsync(
+      initializeFragments,
+    )
+
+    void renderer.computeAsync(
+      initializeNodes,
+    )
+
+  }, [
+    renderer,
     initializeFragments,
-  )
-
-  void renderer.computeAsync(
     initializeNodes,
+  ])
+
+  /* =======================================================
+     GPU UPDATE LOOP
+     ======================================================= */
+
+  useFrame(() => {
+
+    const visualState =
+      getEntityVisualState()
+
+    /* ---------------------------------------------------
+       EXISTING ENTITY STATE
+       --------------------------------------------------- */
+
+    entityActivity.value =
+      visualState.activity
+
+    entityAttention.value =
+      visualState.attention
+
+    entityProcessing.value =
+      visualState.processing
+
+    entityEnergy.value =
+      visualState.energy
+
+    entityNetworkActivity.value =
+      visualState.networkActivity
+
+    /* ---------------------------------------------------
+       GLOBAL VISUAL STATE
+       --------------------------------------------------- */
+
+    redWeight.value =
+      visualState.redWeight
+
+    blueWeight.value =
+      visualState.blueWeight
+
+    goldWeight.value =
+      visualState.goldWeight
+
+    visualIntensity.value =
+      visualState.intensity
+
+    visualMotion.value =
+      visualState.motion
+
+    visualTurbulence.value =
+      visualState.turbulence
+
+    informationDensity.value =
+      visualState.informationDensity
+
+    informationSpeed.value =
+      visualState.informationSpeed
+
+    /* ---------------------------------------------------
+       GPU UPDATE
+       --------------------------------------------------- */
+
+    void renderer.compute(
+      [
+        updateFragments,
+        updateNodes,
+      ],
+    )
+
+  })
+
+  /* =======================================================
+     CLEANUP
+     ======================================================= */
+
+  useEffect(() => {
+
+    return () => {
+
+      fragmentMesh.geometry.dispose()
+
+      nodeMesh.geometry.dispose()
+
+      fragmentMaterial.dispose()
+
+      nodeMaterial.dispose()
+
+    }
+
+  }, [
+    fragmentMesh,
+    nodeMesh,
+    fragmentMaterial,
+    nodeMaterial,
+  ])
+
+  /* =======================================================
+     OUTPUT
+     ======================================================= */
+
+  return (
+    <group>
+
+      <primitive
+        object={fragmentMesh}
+      />
+
+      <primitive
+        object={nodeMesh}
+      />
+
+    </group>
   )
-
-}, [
-  renderer,
-  initializeFragments,
-  initializeNodes,
-])
-
-/* =======================================================
-   GPU UPDATE LOOP
-   ======================================================= */
-
-useFrame(() => {
-
-  /*
-   * Read the current semantic state of ULTRON.
-   *
-   * These values are produced by entitySimulation.ts
-   * and are now fed into the GPU simulation.
-   */
-  const visualState =
-    getEntityVisualState()
-
-  entityActivity.value =
-    visualState.activity
-
-  entityAttention.value =
-    visualState.attention
-
-  entityProcessing.value =
-    visualState.processing
-
-  entityEnergy.value =
-    visualState.energy
-
-  entityNetworkActivity.value =
-    visualState.networkActivity
-
-  /*
-   * Run both GPU simulations.
-   */
-  void renderer.compute(
-    [
-      updateFragments,
-      updateNodes,
-    ],
-  )
-
-})
-
-/* =======================================================
-   CLEANUP
-   ======================================================= */
-
-useEffect(() => {
-
-  return () => {
-
-    fragmentMesh.geometry.dispose()
-
-    nodeMesh.geometry.dispose()
-
-    fragmentMaterial.dispose()
-
-    nodeMaterial.dispose()
-
-  }
-
-}, [
-  fragmentMesh,
-  nodeMesh,
-  fragmentMaterial,
-  nodeMaterial,
-])
-
-return (
-  <group>
-
-    <primitive
-      object={fragmentMesh}
-    />
-
-    <primitive
-      object={nodeMesh}
-    />
-
-  </group>
-)}
+}
