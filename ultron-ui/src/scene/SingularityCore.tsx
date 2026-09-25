@@ -300,7 +300,7 @@ function PlasmaCore() {
         <meshBasicMaterial
           color="#000004"
         />
-      </mesh>
+      </mesh>   
     </group>
   )
 }

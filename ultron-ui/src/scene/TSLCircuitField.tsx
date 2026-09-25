@@ -684,7 +684,6 @@ const updateFragments =
       entityNetworkActivity,
     ],
   )
-
 /* =======================================================
    GPU FRAGMENT MATERIAL
    ======================================================= */
@@ -703,9 +702,6 @@ const fragmentMaterial =
           toneMapped: false,
         })
 
-      /*
-       * GPU-computed position.
-       */
       material.positionNode =
         positions.toAttribute()
 
@@ -724,32 +720,10 @@ const fragmentMaterial =
           ).mul(0.007),
         )
 
-      material.scaleNode =
-        vec2(
-          length,
-          width,
-        )
-
       /*
-       * Dynamic rotation.
-       */
-      material.rotationNode =
-        phases
-          .element(
-            instanceIndex,
-          )
-          .add(
-            time.mul(
-              speeds.element(
-                instanceIndex,
-              ),
-            ),
-          )
-
-      /*
-       * -----------------------------------------------
+       * ---------------------------------------------------
        * COLORS
-       * -----------------------------------------------
+       * ---------------------------------------------------
        */
 
       const red =
@@ -807,6 +781,176 @@ const fragmentMaterial =
         )
 
       /*
+       * ---------------------------------------------------
+       * INFORMATION FLOW
+       * ---------------------------------------------------
+       */
+
+      const fragmentPosition =
+        positions.element(
+          instanceIndex,
+        )
+
+      const informationDrive =
+        entityNetworkActivity
+          .mul(0.60)
+          .add(
+            entityAttention.mul(
+              0.25,
+            ),
+          )
+          .add(
+            entityEnergy.mul(
+              0.15,
+            ),
+          )
+
+      /*
+       * Spatial flow coordinate.
+       */
+      const flowCoordinate =
+        fragmentPosition.x
+          .mul(1.7)
+          .add(
+            fragmentPosition.y.mul(
+              2.1,
+            ),
+          )
+          .add(
+            fragmentPosition.z.mul(
+              1.3,
+            ),
+          )
+
+      /*
+       * Packet speed reacts to ULTRON's
+       * network activity.
+       */
+      const packetSpeed =
+        float(0.70).add(
+          informationDrive.mul(
+            2.0,
+          ),
+        )
+
+      /*
+       * Travelling information packet.
+       */
+      const packetPhase =
+        time
+          .mul(packetSpeed)
+          .add(
+            flowCoordinate.mul(
+              2.2,
+            ),
+          )
+          .add(
+            phases
+              .element(
+                instanceIndex,
+              )
+              .mul(0.35),
+          )
+
+      const packetWave =
+        packetPhase
+          .sin()
+          .mul(0.5)
+          .add(0.5)
+
+      /*
+       * Fading packet trail.
+       */
+      const packetTrail =
+        smoothstep(
+          0.38,
+          0.82,
+          packetWave,
+        )
+
+      /*
+       * Bright packet head.
+       */
+      const packetHead =
+        smoothstep(
+          0.80,
+          0.995,
+          packetWave,
+        )
+
+      /*
+       * Only blue information fragments participate.
+       * Gold remains a special event color.
+       */
+      const informationPulse =
+        blueMask
+          .mul(
+            float(1).sub(
+              goldMask,
+            ),
+          )
+          .mul(
+            informationDrive,
+          )
+          .mul(
+            float(0.18)
+              .add(
+                packetTrail.mul(
+                  0.35,
+                ),
+              )
+              .add(
+                packetHead.mul(
+                  1.80,
+                ),
+              ),
+          )
+
+      /*
+       * Bright packet heads stretch slightly.
+       */
+      const animatedLength =
+        length.mul(
+          float(1.0).add(
+            packetHead.mul(
+              0.65,
+            ),
+          ),
+        )
+
+      material.scaleNode =
+        vec2(
+          animatedLength,
+          width,
+        )
+
+      /*
+       * Dynamic rotation.
+       */
+      material.rotationNode =
+        phases
+          .element(
+            instanceIndex,
+          )
+          .add(
+            time.mul(
+              speeds.element(
+                instanceIndex,
+              ),
+            ),
+          )
+
+      /*
+       * Add information energy.
+       */
+      color =
+        color.add(
+          blue.mul(
+            informationPulse,
+          ),
+        )
+
+      /*
        * Velocity-driven brightness.
        */
       const velocity =
@@ -818,13 +962,19 @@ const fragmentMaterial =
         velocity.length()
 
       const energy =
-        float(0.20).add(
-          smoothstep(
-            0.18,
-            0.95,
-            speed,
-          ).mul(1.10),
-        )
+        float(0.20)
+          .add(
+            smoothstep(
+              0.18,
+              0.95,
+              speed,
+            ).mul(1.10),
+          )
+          .add(
+            informationPulse.mul(
+              0.80,
+            ),
+          )
 
       material.colorNode =
         color.mul(
@@ -859,9 +1009,17 @@ const fragmentMaterial =
             verticalFade,
           )
           .mul(
-            float(0.35).add(
-              energy.mul(0.45),
-            ),
+            float(0.35)
+              .add(
+                energy.mul(
+                  0.45,
+                ),
+              )
+              .add(
+                packetHead.mul(
+                  0.45,
+                ),
+              ),
           )
 
       return material
@@ -873,6 +1031,10 @@ const fragmentMaterial =
       phases,
       speeds,
       lengths,
+
+      entityAttention,
+      entityEnergy,
+      entityNetworkActivity,
     ],
   )
 
@@ -1099,7 +1261,6 @@ const updateNodes =
       nodeVelocities,
     ],
   )
-
 /* =======================================================
    NODE MATERIAL
    ======================================================= */
@@ -1121,12 +1282,67 @@ const nodeMaterial =
       material.positionNode =
         nodePositions.toAttribute()
 
-      const size =
-        float(0.010).add(
-          hash(
-            instanceIndex.add(900),
-          ).mul(0.026),
+      const nodePosition =
+        nodePositions.element(
+          instanceIndex,
         )
+
+      /*
+       * Node pulse follows the same information field
+       * as the circuit fragments.
+       */
+      const nodeFlow =
+        nodePosition.x
+          .mul(1.4)
+          .add(
+            nodePosition.y.mul(
+              1.8,
+            ),
+          )
+          .add(
+            nodePosition.z.mul(
+              1.2,
+            ),
+          )
+
+      const nodePulsePhase =
+        time
+          .mul(
+            float(0.65).add(
+              entityNetworkActivity.mul(
+                1.8,
+              ),
+            ),
+          )
+          .add(
+            nodeFlow.mul(2.0),
+          )
+
+      const nodeWave =
+        nodePulsePhase
+          .sin()
+          .mul(0.5)
+          .add(0.5)
+
+      const nodePulse =
+        smoothstep(
+          0.78,
+          0.995,
+          nodeWave,
+        )
+
+      const size =
+        float(0.010)
+          .add(
+            hash(
+              instanceIndex.add(900),
+            ).mul(0.026),
+          )
+          .add(
+            nodePulse.mul(
+              0.018,
+            ),
+          )
 
       material.scaleNode =
         vec2(
@@ -1134,6 +1350,9 @@ const nodeMaterial =
           size,
         )
 
+      /*
+       * COLORS
+       */
       const red =
         vec3(
           1.0,
@@ -1182,17 +1401,42 @@ const nodeMaterial =
           ),
         )
 
+      /*
+       * Blue information burst.
+       */
+      color =
+        color.add(
+          blue.mul(
+            nodePulse
+              .mul(
+                entityNetworkActivity,
+              )
+              .mul(2.2),
+          ),
+        )
+
       material.colorNode =
-        color.mul(1.35)
+        color.mul(
+          float(1.35).add(
+            nodePulse.mul(
+              1.6,
+            ),
+          ),
+        )
 
       material.opacityNode =
-        float(0.60)
+        float(0.60).add(
+          nodePulse.mul(
+            0.30,
+          ),
+        )
 
       return material
 
     },
     [
       nodePositions,
+      entityNetworkActivity,
     ],
   )
 

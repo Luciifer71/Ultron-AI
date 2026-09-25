@@ -4,6 +4,9 @@ import {
   type UltronMode,
 } from '../state/entityState'
 
+import {
+  updateUltronVisualState,
+} from '../state/visualStateRuntime'
 /* =========================================================
    ENTITY SIMULATION
    Deterministic, continuously evolving semantic state.
@@ -159,6 +162,10 @@ export function updateEntitySimulation(
     state.simulationTime
 
   state.simulationTime += dt
+  updateUltronVisualState(
+  state.mode,
+  dt,
+)
 
   const targets =
     getModeTargets(state.mode)

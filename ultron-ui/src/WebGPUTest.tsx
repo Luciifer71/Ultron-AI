@@ -1,20 +1,28 @@
 import * as THREE from 'three/webgpu'
-import TSLParticleField from './scene/TSLParticleField'
+import TSLParticleField
+  from './scene/TSLParticleField'
+
 import TSLCircuitField
   from './scene/TSLCircuitField'
+
 import TSLComputationalShell
   from './scene/TSLComputationalShell'
+
+import TSLInformationFlow
+  from './scene/TSLInformationFlow'
+
 import TSLEnergyEvents
   from './scene/EnergyEvents'
-  import SimulationRuntime
+
+import TSLSingularityCore
+  from './scene/TSLSingularityCore'
+
+import SimulationRuntime
   from './simulation/SimulationRuntime'
 
 import {
   Canvas,
 } from '@react-three/fiber'
-
-import TSLSingularityCore
-  from './scene/TSLSingularityCore'
 
 export default function WebGPUTest() {
 
@@ -67,13 +75,10 @@ export default function WebGPUTest() {
       >
 
         <TSLSingularityCore />
-
 <TSLParticleField />
-
 <TSLCircuitField />
-
 <TSLComputationalShell />
-
+<TSLInformationFlow />
 <TSLEnergyEvents />
 <SimulationRuntime />
       </Canvas>
